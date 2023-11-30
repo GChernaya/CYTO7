@@ -1,0 +1,44 @@
+---
+title: "Main project"
+author: "Galina Chernaya, Iuliia Matvienko, Olga Serebryakova, Polina Burmakina"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readr)
+library(readxl)
+library(gtsummary)
+library(stringr)
+library(janitor)
+library(openxlsx2)
+library(tidyr)
+
+```
+
+## Загрузка данных
+
+```{r}
+
+df_meta <- read.csv("names.csv", sep = ";", header = TRUE, fileEncoding = "Windows-1251")
+
+
+df <- openxlsx2::read_xlsx("Donor Immune cells (1).xlsx", sheet = 1)  
+duplicated_names <- any(duplicated(names(df)))
+
+df <- as_tibble(df, .name_repair = "minimal")
+
+df <- set_names(df, df_meta$cleaned_names)
+
+df <- df %>%
+  mutate(across(where(is.character), ~ gsub("_", " ", .)))
+
+# Исключаем 2 случая с диагнозом мукополисахаридоз и остеопетроз
+
+df <- df %>% filter(!(str_detect(gruppa_diagnozov_po_voz_a_zgem, "Врожденные / наследственные заболевания")))
+```
+
+
