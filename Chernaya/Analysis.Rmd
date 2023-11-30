@@ -1,0 +1,346 @@
+---
+title: "SCT data analysis"
+author: "Galina Chernaya"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readr)
+library(readxl)
+library(gtsummary)
+library(stringr)
+library(janitor)
+library(openxlsx2)
+library(tidyr)
+
+```
+
+## Загрузка данных
+
+```{r}
+
+df_meta <- read.csv("names.csv", sep = ";", header = TRUE, fileEncoding = "Windows-1251")
+
+
+df <- openxlsx2::read_xlsx("Donor Immune cells (1).xlsx", sheet = 1)  
+duplicated_names <- any(duplicated(names(df)))
+
+df <- as_tibble(df, .name_repair = "minimal")
+
+df <- set_names(df, df_meta$cleaned_names)
+
+df <- df %>%
+  mutate(across(where(is.character), ~ gsub("_", " ", .)))
+
+# Исключаем 2 случая с диагнозом мукополисахаридоз и остеопетроз
+
+df <- df %>% filter(!(str_detect(gruppa_diagnozov_po_voz_a_zgem, "Врожденные / наследственные заболевания")))
+```
+
+## Подготовка данных к анализу, переменные из группы 3:
+
+### Переменные: 
+
+```{r}
+ 
+
+# Переменные группы 3:
+
+group3 <- df_meta %>% filter(Analysis_group == 3) %>% 
+                      select(cleaned_names) %>% pull()
+
+df3 <- df %>% select(group3) 
+
+# Таблица с названиями и типами переменных
+info_table <- tibble(
+  Variable = names(df3),
+  Format = sapply(df3, function(x) class(x)[1]),
+  First_Value = sapply(df3, function(x) x[1]),
+  Missing_Values_Count = sapply(df3, function(x) sum(is.na(x))),
+  Missing_Values_Percentage = sapply(df3, function(x) mean(is.na(x)) * 100)
+)
+
+missing_data <- info_table %>% filter(Missing_Values_Percentage > 0)
+
+
+# приводим переменные к нужному формату:
+cols_to_fix <- c("fakticeskaa_massa_pred_tkm_epikriz", "cummarnaa_doza_razdelit_na_massu_tela_fakticeskuu_ili_plosad_tela_fakticeskuu",
+                 "nc_ptkm_pdi", "cd34_kg_x10_ptkm_pdi")
+
+df3 <- df3 %>%
+  mutate(across(all_of(cols_to_fix), ~as.numeric(gsub(",", ".", .))))
+
+# приведем к общим единицам измерения и переведем в числовой формат переменную cd3_kg_ptkm_pdi:
+
+df3$cd3_kg_ptkm_pdi[df3$cd3_kg_ptkm_pdi == "5,0х10*6"] <- "0,5х10*7"
+
+convert_to_numeric <- function(x) {
+  if (is.na(x)) {
+    return(NA)
+  }
+  x <- gsub(",", ".", x)
+  x <- gsub("x10\\*\\*([0-9]+)", "e\\1", x)
+  x <- gsub("x10\\*([0-9]+)", "e\\1", x)
+  parse_number(x)
+}
+
+df3 <- df3 %>%
+  mutate(cd3_kg_ptkm_pdi = sapply(cd3_kg_ptkm_pdi, convert_to_numeric))  
+
+
+summary(df3)
+
+```
+
+
+
+```{r}
+# Приведение схем профилактики РТПХ к одному виду
+
+df3 <- df3 %>%
+  mutate(preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me = 
+           case_when(
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Сиролимус, Такролимус, Циклофосфан" ~ "Циклофосфан, Такролимус, Сиролимус",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, Такролимус, Сиролимус, " ~ "Циклофосфан, Такролимус, Сиролимус",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Сиролимус, Циклофосфан, MMF" ~ "Циклофосфан, Сиролимус, MMF",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Такролимус, MMF, Циклофосфан" ~ "Циклофосфан, Такролимус, MMF",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Такролимус, MMF, Циклофосфан, Бендамустин" ~ "Циклофосфан, Бендамустин, Такролимус, MMF",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Такролимус, Циклофосфан, MMF" ~ "Циклофосфан, Такролимус, MMF",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Сиролимус, MMF, Циклофосфан" ~ "Циклофосфан, Сиролимус, MMF",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Сиролимус, Селп-септ, Циклофосфан" ~ "Циклофосфан, Сиролимус, MMF",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Сиролимус, Циклофосфан" ~ "Циклофосфан, Сиролимус",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "циклофосфан, Такролимус, MMF" ~ "Циклофосфан, Такролимус, MMF",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, MMF, Такролимус" ~ "Циклофосфан, Такролимус, MMF",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, Бендамустин, MMF, Такролимус" ~ "Циклофосфан, Бендамустин, Такролимус, MMF",
+             preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, Такролимус, Селл-Септ" ~ "Циклофосфан, Такролимус, MMF",
+             TRUE ~ preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me
+           ))
+
+```
+
+
+
+```{r}
+# Приведение значений переменной моноклональных АТ к одному виду
+
+df3 <- df3 %>%
+  mutate(
+    monoklonal_nye_antitela_nazvania_preparatov_pred_tk_me = 
+      monoklonal_nye_antitela_nazvania_preparatov_pred_tk_me %>%
+      str_replace("Bridge-терапия", "") %>%
+      str_replace_all("\\s+", " ") %>%
+      str_to_title()) 
+df3 <- df3 %>% mutate( 
+        monoklonal_nye_antitela_nazvania_preparatov_pred_tk_me = case_when(
+        monoklonal_nye_antitela_nazvania_preparatov_pred_tk_me == "Руксолитиниб, Руксолитиниб" ~ "Руксолитиниб", 
+       str_detect(`monoklonal_nye_antitela_nazvania_preparatov_pred_tk_me`, "Инотузумаб озогамицин") ~ "Инотузумаб, Озогамицин",
+      str_detect(`monoklonal_nye_antitela_nazvania_preparatov_pred_tk_me`, "Гемтузумаб озогамицин") ~ "Гемтузумаб, Озогамицин",
+        str_detect(`monoklonal_nye_antitela_nazvania_preparatov_pred_tk_me`, "Брентуксимаб Ниволумаб") ~ "Брентуксимаб, Ниволумаб",
+      str_detect(`monoklonal_nye_antitela_nazvania_preparatov_pred_tk_me`, "Мидостаурином") ~ "Мидостаурин",
+        TRUE ~ `monoklonal_nye_antitela_nazvania_preparatov_pred_tk_me`
+  ))
+
+```
+
+```{r}
+# Режимы кондиционирования:
+
+df %>% filter(`rezim_kondicionirovania_pred_tk_me` == "не проводится (BOOST)")
+
+df %>% filter(`atg_pred_tk_me` == "да")
+
+df3 <- df3 %>% mutate(shema_rk_pred_tk_me = case_when(
+  shema_rk_pred_tk_me	== "#NAME?" ~ "FluBu",
+  shema_rk_pred_tk_me	== "Bu + benda + Flu" ~ "FluBuBenda",
+  shema_rk_pred_tk_me	== "Bu + Flu" ~ "FluBu",
+  shema_rk_pred_tk_me	== "Flu + Bu" ~ "FluBu",
+  shema_rk_pred_tk_me	== "Bu12 + Flu+ruxo" ~ "FluBuRuxo",
+  shema_rk_pred_tk_me	== "Bu10 + Flu + Mel" ~ "FluBuMel",
+  shema_rk_pred_tk_me	== "Flu + benda" ~ "FluBenda",
+  shema_rk_pred_tk_me	== "Flu + Bu + benda" ~ "FluBuBenda",
+  shema_rk_pred_tk_me	== "Flu + Bu + Mel" ~ "FluBuMel",
+  shema_rk_pred_tk_me	== "Flu + Bu 12" ~ "FluBu",
+  shema_rk_pred_tk_me == "Flu + Bu(10)" ~ "FluBu",
+  shema_rk_pred_tk_me	== "Flu + Bu+Ruxo" ~ "FluBuRuxo",
+  shema_rk_pred_tk_me	== "Flu + Bu10" ~ "FluBu",
+  shema_rk_pred_tk_me	== "Flu + Bu14" ~ "FluBu",
+  shema_rk_pred_tk_me	== "Flu + Bu8" ~ "FluBu",
+  shema_rk_pred_tk_me	== "Flu + Cy" ~ "FluCy",
+  shema_rk_pred_tk_me	== "Flu + Mel" ~ "FluMel",
+  shema_rk_pred_tk_me	== "Flu + Treo" ~ "FluTreo",
+  shema_rk_pred_tk_me == "FluBu10" ~ "FluBu",
+  shema_rk_pred_tk_me == "FluBu8" ~ "FluBu",
+  shema_rk_pred_tk_me == "FluBu12" ~ "FluBu",
+  shema_rk_pred_tk_me == "FluBu14" ~ "FluBu",
+  shema_rk_pred_tk_me	== "Mel + Flu" ~ "FluMel", 
+  shema_rk_pred_tk_me	== "Treo + Flu" ~ "FluTreo", 
+  TRUE ~ shema_rk_pred_tk_me
+))
+
+
+
+```
+
+```{r}
+# Выделим в отдельные группы пациентов, получающих Треосульфан и Бусульфан, создадим переменные cummarnaa_doza_treosulfana, cummarnaa_doza_treosulfana_na_plosad_tela_fakticeskuu:
+
+df3 <- df3 %>%
+  mutate(
+    cummarnaa_doza_treosulfana = ifelse(
+      str_detect(preparaty_rezima_kondicionirovania_pred_tk_me, "Треосульфан"),
+      cummarnaa_doza_busul_fana,
+      NA
+    ),
+    cummarnaa_doza_busul_fana = ifelse(
+      str_detect(preparaty_rezima_kondicionirovania_pred_tk_me, "Треосульфан"),
+      0,
+      cummarnaa_doza_busul_fana
+    ),
+    cummarnaa_doza_treosulfana_na_plosad_tela_fakticeskuu = ifelse(
+      str_detect(preparaty_rezima_kondicionirovania_pred_tk_me, "Треосульфан"), cummarnaa_doza_razdelit_na_massu_tela_fakticeskuu_ili_plosad_tela_fakticeskuu, 
+      NA
+    ),
+    cummarnaa_doza_razdelit_na_massu_tela_fakticeskuu_ili_plosad_tela_fakticeskuu = ifelse(
+      str_detect(preparaty_rezima_kondicionirovania_pred_tk_me, "Треосульфан"),
+      0,
+      cummarnaa_doza_razdelit_na_massu_tela_fakticeskuu_ili_plosad_tela_fakticeskuu
+    ),
+    cummarnaa_doza_busulfana_razdelit_na_massu_tela = cummarnaa_doza_razdelit_na_massu_tela_fakticeskuu_ili_plosad_tela_fakticeskuu
+  ) %>%
+  select(-cummarnaa_doza_razdelit_na_massu_tela_fakticeskuu_ili_plosad_tela_fakticeskuu)
+  
+# Если доза Бусульфана = 0, заменим на NA:
+
+df3 <- df3 %>%
+  mutate(cummarnaa_doza_busul_fana = ifelse(cummarnaa_doza_busul_fana == 0, NA, cummarnaa_doza_busul_fana),
+         cummarnaa_doza_busulfana_razdelit_na_massu_tela = ifelse(cummarnaa_doza_busulfana_razdelit_na_massu_tela == 0,
+                                                                  NA, cummarnaa_doza_busulfana_razdelit_na_massu_tela))
+
+# В переменной summarnaa_doza_pred_tk_me для пациента, которому не проводилась предТКМ терапия, указано значение ", ", заменим на NA:
+
+df3 <- df3 %>% 
+  mutate(summarnaa_doza_pred_tk_me = ifelse(summarnaa_doza_pred_tk_me == ", ", NA, summarnaa_doza_pred_tk_me))
+
+
+```
+### Номинативные переменные:
+
+```{r}
+
+
+n <- df3 %>% select(where(is.character)) %>% names()
+
+summary_tables <- lapply(n, function(var) {
+  df3 %>%
+    select({{ var }}) %>%
+    tbl_summary()
+})
+
+summary_tables
+```
+
+### Числовые переменные
+
+
+```{r}
+
+m <- df3 %>% select(where(is.numeric)) %>% names()
+
+
+
+
+summary_tables_num <- lapply(m, function(var) {
+  df3 %>%
+    select({{ var }}) %>%
+    tbl_summary(
+      statistic = list(
+        all_continuous() ~ "{mean} ± {sd} (min = {min}, max = {max})"
+      ),
+      missing = "no"
+    ) 
+})
+
+summary_tables_num
+
+
+```
+
+```{r}
+
+tbl_num <- df3 %>% select(where(is.numeric)) %>%
+  tbl_summary(
+    missing = "always", 
+    type = everything() ~ "continuous2",
+    statistic = everything() ~ c("{median} ({p25}, {p75})", "{min}, {max}", "{mean} ({sd})") 
+  ) 
+
+tbl_num
+```
+
+
+
+### Таблица по дозам и количеству доз препаратов режима кондиционирования
+
+
+```{r}
+conditioning <- tibble(patient = df$pacient,
+                       schema = df3$shema_rk_pred_tk_me,
+                       drug = df3$preparaty_rezima_kondicionirovania_pred_tk_me,
+                       dose = df3$summarnaa_doza_pred_tk_me,
+                       bu_dose = df3$cummarnaa_doza_busul_fana)
+
+ conditioning <- conditioning %>%
+  pivot_longer(
+    cols = c(drug, dose),
+    names_to = "variable",
+    values_to = "value",
+    values_drop_na = TRUE
+  ) %>%
+  separate_rows(value, sep = "[,;]\\s*") %>%
+  pivot_wider(names_from = variable, values_from = value) %>% unnest(cols = c(drug, dose))
+
+ 
+ conditioning <- conditioning %>%
+  group_by(patient) %>%
+  mutate(drug_number = row_number()) %>% select(patient, schema, drug_number, drug, dose, bu_dose) %>% mutate(dose = as.numeric(dose)) 
+ 
+ # У пациента 51 терапия не проводилась, у пациента 60 - 2 препарата, внесем корректировки в датасет:
+ 
+ conditioning <- conditioning %>% filter(!(patient == "Patient51")) %>% filter(!(patient == "Patient60" & drug_number == 3))
+ 
+ conditioning
+
+ tibble(drug = conditioning$drug) %>%
+  tbl_summary() 
+ 
+ 
+ # Проверка, совпадают ли суммарные дозы для Бусульфана:
+ 
+ conditioning %>% filter(str_detect(drug, "Бусульфан")) %>% group_by(patient) %>% summarize(sum = sum(dose, na.rm = TRUE)) %>% left_join(df %>% mutate(patient = pacient) %>% select(patient, cummarnaa_doza_busul_fana) %>% filter(!(patient == "Patient51")), by = "patient") %>% mutate(diff = round(sum - as.numeric(cummarnaa_doza_busul_fana), digits = 1)) -> result
+ total_diff_sum <- sum(result$diff, na.rm = TRUE)
+total_diff_sum
+ # Дозы совпадают.
+ 
+ 
+ 
+ 
+```
+
+
+Группы по возрасту:
+
+```{r}
+ 
+
+```
+
+Группы по диагнозу: 
+
+```{r}
+
+
+```
