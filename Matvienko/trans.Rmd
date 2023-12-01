@@ -1,0 +1,425 @@
+---
+title: "Donor Immune Cells Project"
+author: "Юлия Матвиенко"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(openxlsx2)
+library(janitor)
+library(lubridate)
+library(tidyverse)
+library(stringr)
+library(gtsummary)
+library(ggplot2)
+library(survival)
+library(ggsurvfit)
+library(tidycmprsk)
+```
+
+
+# Загружаем данные
+```{r message=FALSE, warning=FALSE}
+trans_meta <- read_csv("names.csv")
+
+trans <- openxlsx2::read_xlsx("Donor Immune cells (1).xlsx") %>%
+  set_names(trans_meta$cleaned_names)
+
+trans_wrk <- trans %>%
+  filter(pacient != "Patient34" & pacient != "Patient63") #Рабочая версия датафрейма - исключили пациентов с наследственными заболеваниями
+
+trans_wrk$koza_stepen_1god[trans_wrk$spisok_koznyh_proavlenij_s_primecaniami_1god == 'макуло-папулёзнвя сыпь 25-50%'] <- 2
+trans_wrk$summarnaa_stepen_tazesti_hrtph_1god[trans_wrk$spisok_koznyh_proavlenij_s_primecaniami_1god == 'макуло-папулёзнвя сыпь 25-50%'] <- 2
+trans_wrk$a_gvhd24time[trans_wrk$a_gvhd24time == -280 & !is.na(trans_wrk$a_gvhd24time)] <- 85
+trans_wrk$c_gvh_dtime[trans_wrk$c_gvh_dtime == -100 & !is.na(trans_wrk$c_gvh_dtime)] <- 145
+#Исправили данные по согласованию с Николаем
+
+outcome_var <- trans_meta %>%
+  filter(Analysis_group == 4) %>%
+  pull(cleaned_names)
+
+trans_outcomes <- trans_wrk %>%
+  select(pacient, all_of(outcome_var)) #Датафрейм - все исходы
+
+trans_outcomes_wrk <- trans_outcomes %>%
+  select(ly30, ly60, ly100, neu30, neu60, neu100, plt30, plt60, plt100,
+         os2, os2time, rel2, rel2time, compete2, compete2time, efs2, efs2time,
+         a_gvhd24, a_gvhd24time, a_gvhd34, a_gvhd34time, c_gvhd, c_gvh_dtime,
+         data_tkm_iz_protokola_ptkm_pdi,
+         vysevy_iz_cvk_v_pervye_30_nej_posle_tkm,
+         vosstanovlenie_lejkocity_data_tpp_100_dn,
+         vosstanovlenie_nejtrofily_data_tpp_100_dn,
+         vosstanovlenie_tr20_data_tpp_100_dn,
+         vosstanovlenie_tr50_data_tpp_100_dn,
+         wbc_2, neu, plt20, plt50, ottorzenie_tpp_100dn,
+         ortph_da_net_tpp_100dn, agvhd_stage, agvhd_date,
+         data_poslednego_kontakta,
+         byl_li_zaregistrirovan_recidiv_progressia_osnovnogo_zabolevania_posle_tkm_1god,
+         data_recidiva_1god, zaregistrirovana_hroniceskaa_rtph_na_d_365_1god,
+         data_nacala_1god, forma_1god,
+         contains('stepen_1god'),
+         contains('proavlen'),
+         summarnaa_stepen_tazesti_hrtph_1god) #Рабочий датафрейм с исходами (только желтые колонки)
+
+rm(outcome_var)
+```
+
+# Структура данных
+
+```{r include=FALSE}
+summary(trans_outcomes_wrk)
+```
+
+# Корректируем типы данных
+
+```{r}
+trans_outcomes_wrk <- trans_outcomes_wrk %>%
+  mutate_at(c('ly30', 'ly60', 'ly100', 'neu30', 'neu60', 'neu100'),
+            str_replace,
+            pattern = ",",
+            replacement = ".") %>%
+  mutate_at(c('ly30', 'ly60', 'ly100', 'neu30', 'neu60', 'neu100'), as.numeric) %>%
+  mutate_at(c('os2', 'rel2', 'compete2', 'efs2', 'a_gvhd24', 'a_gvhd34', 'c_gvhd', 'ortph_da_net_tpp_100dn', 'agvhd_stage', 'byl_li_zaregistrirovan_recidiv_progressia_osnovnogo_zabolevania_posle_tkm_1god', 'zaregistrirovana_hroniceskaa_rtph_na_d_365_1god', 'drugie_proavlenia_hrtph_1god'), as.factor) %>%
+  mutate_at(c('data_tkm_iz_protokola_ptkm_pdi', 'vosstanovlenie_lejkocity_data_tpp_100_dn', 'vosstanovlenie_nejtrofily_data_tpp_100_dn', 'vosstanovlenie_tr20_data_tpp_100_dn', 'vosstanovlenie_tr50_data_tpp_100_dn', 'agvhd_date', 'data_poslednego_kontakta', 'data_recidiva_1god', 'data_nacala_1god'), ~ format(as.Date(., format = "%Y-%m-%d"), "%d.%m.%Y")) %>%
+  mutate(across(contains('stepen'), ~ factor(.)))
+```
+
+
+# Работаем с текстовыми колонками
+```{r}
+trans_outcomes_wrk %>%
+  distinct(vysevy_iz_cvk_v_pervye_30_nej_posle_tkm) #Возможные значения
+
+trans_outcomes_wrk <- trans_outcomes_wrk %>%
+  mutate(cvk_not_sterile = as.factor(ifelse(str_detect(vysevy_iz_cvk_v_pervye_30_nej_posle_tkm, 'не стерильно'), 1, 0)),
+         cvk_vysev_type = as.factor(str_remove(vysevy_iz_cvk_v_pervye_30_nej_posle_tkm, ": не стерильно"))) # Разбили столбец с высевами
+
+trans_outcomes_wrk %>%
+  distinct(ottorzenie_tpp_100dn) # Можно просто сделать фактором
+
+trans_outcomes_wrk <- trans_outcomes_wrk %>%
+  mutate(ottorzenie_tpp_100dn = as.factor(ottorzenie_tpp_100dn))
+
+trans_outcomes_wrk %>%
+  distinct(forma_1god) #Сделаем фактором с 2 уровнями (экстенсивная или локализованная)
+
+trans_outcomes_wrk <- trans_outcomes_wrk %>%
+  mutate(forma_1god = case_when(forma_1god == "экстенсивная_форма" | forma_1god == "экс" ~ "экстенсивная",
+                                forma_1god == "локализованная" | forma_1god == "локализованная_форма" ~ "локализованная")) %>%
+  mutate(forma_1god = as.factor(forma_1god))
+
+trans_outcomes_wrk %>%
+  distinct(spisok_koznyh_proavlenij_s_primecaniami_1god)
+
+trans_outcomes_wrk <- trans_outcomes_wrk %>%
+  mutate(skin_involvement = case_when(str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "поражение кожи: менее_18%") ~ '< 18%',
+                                      str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "поражение кожи: 19-50%") ~ '19-50%',
+                                      str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "поражение кожи: нет_симптомов") ~ 'Нет симптомов'),
+         mac_pap_rash = case_when(str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "макуло-папулёзная сыпь 25-50%") ~ '25-50%',
+                                  str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "макуло-папулезная сыпь: ,") ~ 'Неуточненная распространенность'),
+         nail_involvement = case_when(str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "повреждение ногтей: ониходистрофия") ~ 'Ониходистрофия',
+                                      str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "повреждение ногтей: ") & !str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "повреждение ногтей: ониходистрофия") ~ 'Неуточненное')) %>%
+  mutate_at(c('skin_involvement', 'mac_pap_rash', 'nail_involvement'), as.factor)
+
+trans_outcomes_wrk %>%
+  distinct(spisok_proavlenij_s_primecaniami_polost_rta_1god)
+
+trans_outcomes_wrk <- trans_outcomes_wrk %>%
+  mutate(oral_mucosa_involvement = case_when(str_detect(spisok_proavlenij_s_primecaniami_polost_rta_1god, "изменения слизистой ротоглотки: умеренные") ~ "Умеренные изменения",
+                                      str_detect(spisok_proavlenij_s_primecaniami_polost_rta_1god, "изменения слизистой ротоглотки: легкие") ~ "Легкие изменения"),
+         food_intake_limitation = ifelse(str_detect(spisok_proavlenij_s_primecaniami_polost_rta_1god, "ограничение перорального приема пищи: нет"), "Нет")) %>%
+  mutate_at(c('oral_mucosa_involvement', 'food_intake_limitation'), as.factor)
+
+trans_outcomes_wrk %>%
+  distinct(spisok_glaznyh_proavlenij_1god)
+
+trans_outcomes_wrk <- trans_outcomes_wrk %>%
+  mutate(dry_eye = case_when(str_detect(spisok_glaznyh_proavlenij_1god, "синдром &#34;сухого глаза&#34;: легкой_степени") ~ "Легкой степени",
+                             str_detect(spisok_glaznyh_proavlenij_1god, "синдром &#34;сухого глаза&#34;: нет") ~ "Нет"),
+         keratoconjunctivitis = case_when(str_detect(spisok_glaznyh_proavlenij_1god, "кератоконъюнктивит: умеренно_выраженный") ~ "Умеренно выраженный",
+                                          str_detect(spisok_glaznyh_proavlenij_1god, "кератоконъюнктивит: отсутствует") ~ "Отсутствует"),
+         daily_activity_eye = case_when(str_detect(spisok_glaznyh_proavlenij_1god, "повседневная деятельность: частично_нарушена") ~ "Частично нарушена",
+                                        str_detect(spisok_glaznyh_proavlenij_1god, "повседневная деятельность: не_нарушена") ~ "Не нарушена"),
+         eye_drops = case_when(str_detect(spisok_glaznyh_proavlenij_1god, "увлажнение глазными каплями: до_3_раз_в_день") ~ "До 3 раз в день",
+                               str_detect(spisok_glaznyh_proavlenij_1god, "увлажнение глазными каплями: не_требуется") ~ "Не требуется"),
+         vision_impaiment = ifelse(str_detect(spisok_glaznyh_proavlenij_1god, "снижение зрения: нет"), "Нет", NA)) %>%
+  mutate_at(c('dry_eye', 'keratoconjunctivitis', 'daily_activity_eye', 'eye_drops', 'vision_impaiment'), as.factor)
+
+trans_outcomes_wrk %>%
+  distinct(zkt_proavlenia_1god) #Только стадия 0 - можно не выносить отдельно
+
+trans_outcomes_wrk %>%
+  distinct(pecen_proavlenia_1god)
+
+trans_outcomes_wrk <- trans_outcomes_wrk %>%
+  mutate(bilirubin = case_when(str_detect(pecen_proavlenia_1god, "билирубин: увеличение_более_50_мкмоль/л") ~ ">50 мкмоль/л",
+                               str_detect(pecen_proavlenia_1god, "билирубин: норма") ~ "Норма"),
+         alat_asat_aph = case_when(str_detect(pecen_proavlenia_1god, "ферменты (АЛТ, АСТ, ЩФ): увеличение_2-5_норм") ~ "Увеличение 2-5 норм",
+                                   str_detect(pecen_proavlenia_1god, "ферменты (АЛТ, АСТ, ЩФ): норма") ~ "Норма")) %>%
+  mutate_at(c('bilirubin', 'alat_asat_aph'), as.factor)
+
+trans_outcomes_wrk %>%
+  distinct(legkie_proavlenia_1god) #Только стадия 0 - можно не выносить отдельно
+
+trans_outcomes_wrk %>%
+  distinct(sustavy_i_fascii_proavlenia_1god)
+
+trans_outcomes_wrk <- trans_outcomes_wrk %>%
+  mutate(motion_discomfort = case_when(str_detect(sustavy_i_fascii_proavlenia_1god, "дискомфорт при движении рук, ног: легкий") ~ "Легкий",
+                                       str_detect(sustavy_i_fascii_proavlenia_1god, "дискомфорт при движении рук, ног: отсутствует") ~ "Отсуствует"),
+         motion_range = case_when(str_detect(sustavy_i_fascii_proavlenia_1god, "объем движений в суставах: слегка снижен") ~ "Слегка снижен",
+                                  str_detect(sustavy_i_fascii_proavlenia_1god, "объем движений в суставах: норма") ~ "Норма"),
+         contracture = ifelse(str_detect(sustavy_i_fascii_proavlenia_1god, "контрактуры: отсутствуют"), "Отсутствует", NA),
+         motion_activity = ifelse(str_detect(sustavy_i_fascii_proavlenia_1god, "активность движений: нормальная"), "Нормальная", NA),
+         daily_activity_motion = ifelse(str_detect(sustavy_i_fascii_proavlenia_1god, "ежедневная активность: нормальная"), "Нормальная", NA),
+         fasciitis_erythema = ifelse(str_detect(sustavy_i_fascii_proavlenia_1god, "фасциитом: отсутствует"), "Отсутствует", NA)) %>%
+  mutate_at(c('motion_discomfort', 'motion_range', 'contracture', 'motion_activity', 'daily_activity_motion', 'fasciitis_erythema'), as.factor)
+
+trans_outcomes_wrk %>%
+  distinct(polovye_organy_proavlenia_1god) #Только стадия 0 - можно не выносить отдельно
+```
+
+# Проверим структуру данных
+
+```{r include=FALSE}
+summary(trans_outcomes_wrk)
+```
+
+# Описательная статистика (начало)
+
+## Показатели восстановления
+
+```{r}
+trans_outcomes_wrk %>%
+  select(ly30:plt100) %>%
+  tbl_summary() %>%
+  modify_caption("**Показатели крови в Д+30, +60, +100**") %>%
+  bold_labels()
+
+trans_outcomes_wrk %>%
+  select(wbc_2:plt50) %>%
+  tbl_summary() %>%
+  modify_caption("**Сроки восстановления**") %>%
+  bold_labels()
+```
+
+## Общая выживаемость
+```{r}
+os <- survfit(Surv(time = os2time, event = as.numeric(os2)) ~ 1, data = trans_outcomes_wrk)
+os %>%
+  ggsurvfit(linewidth = 1) +
+  add_censor_mark(shape = "+", size = 5) +
+  add_confidence_interval() +
+  add_quantile() +
+  add_risktable() +
+  scale_ggsurvfit() +
+  coord_cartesian(xlim = c(0, 800)) +
+  labs(
+    title = "Overall Survival",
+    x = "Days after HSCT"
+  ) +
+  theme_classic()
+```
+
+## Медиана ОВ
+```{r}
+tbl_survfit(os,
+            probs = 0.5,
+            label_header = "**Median Survival**")
+```
+
+## 2-летняя ОВ
+```{r}
+tbl_survfit(os,
+            times = 730,
+            label_header = "**2-year OS**")
+```
+
+## Бессобытийная выживаемость
+```{r}
+efs <- survfit(Surv(time = efs2time, event = as.numeric(efs2)) ~ 1, data = trans_outcomes_wrk)
+efs %>%
+  ggsurvfit(linewidth = 1) +
+  add_censor_mark(shape = "+", size = 5) +
+  add_confidence_interval() +
+  add_quantile() +
+  add_risktable() +
+  scale_ggsurvfit() +
+  coord_cartesian(xlim = c(0, 800)) +
+  labs(
+    title = "Event-Free Survival",
+    x = "Days after HSCT"
+  ) +
+  theme_classic()
+```
+## Медиана БСВ
+```{r}
+tbl_survfit(efs,
+            probs = 0.5,
+            label_header = "**Median Survival**")
+```
+
+## 2-летняя БСВ
+```{r}
+tbl_survfit(efs,
+            times = 730,
+            label_header = "**2-year EFS**")
+```
+
+## Кумулятивная частота рецидива
+```{r}
+
+
+trans_outcomes_wrk %>%
+  select(byl_li_zaregistrirovan_recidiv_progressia_osnovnogo_zabolevania_posle_tkm_1god) %>%
+  tbl_summary
+
+
+cir <- cuminc(Surv(time = rel2time, event = rel2) ~ 1, data = trans_outcomes_wrk)
+cir %>%
+  ggcuminc(linewidth = 1) +
+  add_censor_mark(shape = "+", size = 5) +
+  add_confidence_interval() +
+  add_quantile() +
+  add_risktable() +
+  scale_ggsurvfit() +
+  coord_cartesian(xlim = c(0, 800),
+                  ylim = c(0, 1.05)) +
+  labs(
+    title = "Cumulative Incidence of Relapse",
+    x = "Days after HSCT"
+  ) +
+  theme_classic()
+```
+
+## КЧР через 2 года
+```{r}
+tbl_cuminc(cir,
+           times = 730,
+           label_header = "**CIR at 2 years**")
+```
+
+
+## Анализ конкурирующих рисков (1 - смерть без рецидива, 2 - рецидив)
+```{r}
+comp_risks_rel <- cuminc(Surv(time = compete2time, event = compete2) ~ 1, data = trans_outcomes_wrk)
+comp_risks_rel %>%
+  ggcuminc(outcome = c(1,2),
+                       linewidth = 1) +
+  add_censor_mark(shape = "+", size = 5) +
+  add_confidence_interval() +
+  add_quantile() +
+  add_risktable() +
+  scale_ggsurvfit() +
+  coord_cartesian(xlim = c(0, 800),
+                  ylim = c(0, 1.05)) +
+  labs(
+    title = "Cumulative Incidence of Relapse with Competing Risks",
+    x = "Days after HSCT"
+  ) +
+  theme_classic()
+```
+
+## Кумулятивная частота событий через 2 года
+```{r}
+tbl_cuminc(comp_risks_rel,
+           outcomes = c(1,2),
+           times = 730,
+           label_header = "**Cumulative Incidence at 2 years**")
+```
+## Высевы из ЦВК
+```{r}
+trans_outcomes_wrk %>%
+  select(cvk_not_sterile, cvk_vysev_type) %>%
+  tbl_summary() %>%
+  modify_caption("**Частота высевов**") %>%
+  bold_labels()
+```
+
+
+## РТПХ c учетом конкурирующих рисков (1 - проявления РТПХ, 2 - рецидив или летальный исход)
+```{r}
+comp_risks_agvhd24 <- cuminc(Surv(time = a_gvhd24time, event = a_gvhd24) ~ 1, data = trans_outcomes_wrk)
+comp_risks_agvhd24 %>%
+  ggcuminc(outcome = c(1,2),
+                       linewidth = 1) +
+  add_censor_mark(shape = "+", size = 5) +
+  add_confidence_interval() +
+  add_quantile() +
+  add_risktable() +
+  scale_ggsurvfit() +
+  coord_cartesian(xlim = c(0, 160),
+                  ylim = c(0, 1.05)) +
+  labs(
+    title = "Cumulative Incidence of Grade 2-4 aGVHD with Competing Risks",
+    x = "Days after HSCT"
+  ) +
+  theme_classic()
+
+comp_risks_agvhd34 <- cuminc(Surv(time = a_gvhd34time, event = a_gvhd34) ~ 1, data = trans_outcomes_wrk)
+comp_risks_agvhd34 %>%
+  ggcuminc(outcome = c(1,2),
+                       linewidth = 1) +
+  add_censor_mark(shape = "+", size = 5) +
+  add_confidence_interval() +
+  add_quantile() +
+  add_risktable() +
+  scale_ggsurvfit() +
+  coord_cartesian(xlim = c(0, 160),
+                  ylim = c(0, 1.05)) +
+  labs(
+    title = "Cumulative Incidence of Grade 3-4 aGVHD with Competing Risks",
+    x = "Days after HSCT"
+  ) +
+  theme_classic()
+
+comp_risks_сgvhd <- cuminc(Surv(time = c_gvh_dtime, event = c_gvhd) ~ 1, data = trans_outcomes_wrk)
+comp_risks_сgvhd %>%
+  ggcuminc(outcome = c(1,2),
+                       linewidth = 1) +
+  add_censor_mark(shape = "+", size = 5) +
+  add_confidence_interval() +
+  add_quantile() +
+  add_risktable() +
+  scale_ggsurvfit() +
+  coord_cartesian(xlim = c(0, 740),
+                  ylim = c(0, 1.05)) +
+  labs(
+    title = "Cumulative Incidence of сGVHD with Competing Risks",
+    x = "Days after D+100 HSCT"
+  ) +
+  theme_classic()
+```
+
+## Отторжение и РТПХ (частота)
+```{r}
+
+trans_outcomes_wrk %>%
+  select(a_gvhd24,
+         a_gvhd34,
+         c_gvhd) %>%
+  tbl_summary() %>%
+  bold_labels()
+
+
+trans_outcomes_wrk %>%
+  select(ottorzenie_tpp_100dn,
+         ortph_da_net_tpp_100dn,
+         agvhd_stage) %>%
+  tbl_summary() %>%
+  bold_labels()
+
+trans_outcomes_wrk %>%
+  select(zaregistrirovana_hroniceskaa_rtph_na_d_365_1god,
+         forma_1god:polovye_organy_stepen_1god,
+         drugie_proavlenia_hrtph_1god,
+         summarnaa_stepen_tazesti_hrtph_1god) %>%
+  tbl_summary() %>%
+  bold_labels()
+```
+
