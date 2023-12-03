@@ -69,12 +69,6 @@ trans_outcomes_wrk <- trans_outcomes %>%
 rm(outcome_var)
 ```
 
-# Структура данных
-
-```{r include=FALSE}
-summary(trans_outcomes_wrk)
-```
-
 # Корректируем типы данных
 
 ```{r}
@@ -92,102 +86,13 @@ trans_outcomes_wrk <- trans_outcomes_wrk %>%
 
 # Работаем с текстовыми колонками
 ```{r}
-trans_outcomes_wrk %>%
-  distinct(vysevy_iz_cvk_v_pervye_30_nej_posle_tkm) #Возможные значения
 
 trans_outcomes_wrk <- trans_outcomes_wrk %>%
   mutate(cvk_not_sterile = as.factor(ifelse(str_detect(vysevy_iz_cvk_v_pervye_30_nej_posle_tkm, 'не стерильно'), 1, 0)),
          cvk_vysev_type = as.factor(str_remove(vysevy_iz_cvk_v_pervye_30_nej_posle_tkm, ": не стерильно"))) # Разбили столбец с высевами
 
-trans_outcomes_wrk %>%
-  distinct(ottorzenie_tpp_100dn) # Можно просто сделать фактором
-
 trans_outcomes_wrk <- trans_outcomes_wrk %>%
   mutate(ottorzenie_tpp_100dn = as.factor(ottorzenie_tpp_100dn))
-
-trans_outcomes_wrk %>%
-  distinct(forma_1god) #Сделаем фактором с 2 уровнями (экстенсивная или локализованная)
-
-trans_outcomes_wrk <- trans_outcomes_wrk %>%
-  mutate(forma_1god = case_when(forma_1god == "экстенсивная_форма" | forma_1god == "экс" ~ "экстенсивная",
-                                forma_1god == "локализованная" | forma_1god == "локализованная_форма" ~ "локализованная")) %>%
-  mutate(forma_1god = as.factor(forma_1god))
-
-trans_outcomes_wrk %>%
-  distinct(spisok_koznyh_proavlenij_s_primecaniami_1god)
-
-trans_outcomes_wrk <- trans_outcomes_wrk %>%
-  mutate(skin_involvement = case_when(str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "поражение кожи: менее_18%") ~ '< 18%',
-                                      str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "поражение кожи: 19-50%") ~ '19-50%',
-                                      str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "поражение кожи: нет_симптомов") ~ 'Нет симптомов'),
-         mac_pap_rash = case_when(str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "макуло-папулёзная сыпь 25-50%") ~ '25-50%',
-                                  str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "макуло-папулезная сыпь: ,") ~ 'Неуточненная распространенность'),
-         nail_involvement = case_when(str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "повреждение ногтей: ониходистрофия") ~ 'Ониходистрофия',
-                                      str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "повреждение ногтей: ") & !str_detect(spisok_koznyh_proavlenij_s_primecaniami_1god, "повреждение ногтей: ониходистрофия") ~ 'Неуточненное')) %>%
-  mutate_at(c('skin_involvement', 'mac_pap_rash', 'nail_involvement'), as.factor)
-
-trans_outcomes_wrk %>%
-  distinct(spisok_proavlenij_s_primecaniami_polost_rta_1god)
-
-trans_outcomes_wrk <- trans_outcomes_wrk %>%
-  mutate(oral_mucosa_involvement = case_when(str_detect(spisok_proavlenij_s_primecaniami_polost_rta_1god, "изменения слизистой ротоглотки: умеренные") ~ "Умеренные изменения",
-                                      str_detect(spisok_proavlenij_s_primecaniami_polost_rta_1god, "изменения слизистой ротоглотки: легкие") ~ "Легкие изменения"),
-         food_intake_limitation = ifelse(str_detect(spisok_proavlenij_s_primecaniami_polost_rta_1god, "ограничение перорального приема пищи: нет"), "Нет")) %>%
-  mutate_at(c('oral_mucosa_involvement', 'food_intake_limitation'), as.factor)
-
-trans_outcomes_wrk %>%
-  distinct(spisok_glaznyh_proavlenij_1god)
-
-trans_outcomes_wrk <- trans_outcomes_wrk %>%
-  mutate(dry_eye = case_when(str_detect(spisok_glaznyh_proavlenij_1god, "синдром &#34;сухого глаза&#34;: легкой_степени") ~ "Легкой степени",
-                             str_detect(spisok_glaznyh_proavlenij_1god, "синдром &#34;сухого глаза&#34;: нет") ~ "Нет"),
-         keratoconjunctivitis = case_when(str_detect(spisok_glaznyh_proavlenij_1god, "кератоконъюнктивит: умеренно_выраженный") ~ "Умеренно выраженный",
-                                          str_detect(spisok_glaznyh_proavlenij_1god, "кератоконъюнктивит: отсутствует") ~ "Отсутствует"),
-         daily_activity_eye = case_when(str_detect(spisok_glaznyh_proavlenij_1god, "повседневная деятельность: частично_нарушена") ~ "Частично нарушена",
-                                        str_detect(spisok_glaznyh_proavlenij_1god, "повседневная деятельность: не_нарушена") ~ "Не нарушена"),
-         eye_drops = case_when(str_detect(spisok_glaznyh_proavlenij_1god, "увлажнение глазными каплями: до_3_раз_в_день") ~ "До 3 раз в день",
-                               str_detect(spisok_glaznyh_proavlenij_1god, "увлажнение глазными каплями: не_требуется") ~ "Не требуется"),
-         vision_impaiment = ifelse(str_detect(spisok_glaznyh_proavlenij_1god, "снижение зрения: нет"), "Нет", NA)) %>%
-  mutate_at(c('dry_eye', 'keratoconjunctivitis', 'daily_activity_eye', 'eye_drops', 'vision_impaiment'), as.factor)
-
-trans_outcomes_wrk %>%
-  distinct(zkt_proavlenia_1god) #Только стадия 0 - можно не выносить отдельно
-
-trans_outcomes_wrk %>%
-  distinct(pecen_proavlenia_1god)
-
-trans_outcomes_wrk <- trans_outcomes_wrk %>%
-  mutate(bilirubin = case_when(str_detect(pecen_proavlenia_1god, "билирубин: увеличение_более_50_мкмоль/л") ~ ">50 мкмоль/л",
-                               str_detect(pecen_proavlenia_1god, "билирубин: норма") ~ "Норма"),
-         alat_asat_aph = case_when(str_detect(pecen_proavlenia_1god, "ферменты (АЛТ, АСТ, ЩФ): увеличение_2-5_норм") ~ "Увеличение 2-5 норм",
-                                   str_detect(pecen_proavlenia_1god, "ферменты (АЛТ, АСТ, ЩФ): норма") ~ "Норма")) %>%
-  mutate_at(c('bilirubin', 'alat_asat_aph'), as.factor)
-
-trans_outcomes_wrk %>%
-  distinct(legkie_proavlenia_1god) #Только стадия 0 - можно не выносить отдельно
-
-trans_outcomes_wrk %>%
-  distinct(sustavy_i_fascii_proavlenia_1god)
-
-trans_outcomes_wrk <- trans_outcomes_wrk %>%
-  mutate(motion_discomfort = case_when(str_detect(sustavy_i_fascii_proavlenia_1god, "дискомфорт при движении рук, ног: легкий") ~ "Легкий",
-                                       str_detect(sustavy_i_fascii_proavlenia_1god, "дискомфорт при движении рук, ног: отсутствует") ~ "Отсуствует"),
-         motion_range = case_when(str_detect(sustavy_i_fascii_proavlenia_1god, "объем движений в суставах: слегка снижен") ~ "Слегка снижен",
-                                  str_detect(sustavy_i_fascii_proavlenia_1god, "объем движений в суставах: норма") ~ "Норма"),
-         contracture = ifelse(str_detect(sustavy_i_fascii_proavlenia_1god, "контрактуры: отсутствуют"), "Отсутствует", NA),
-         motion_activity = ifelse(str_detect(sustavy_i_fascii_proavlenia_1god, "активность движений: нормальная"), "Нормальная", NA),
-         daily_activity_motion = ifelse(str_detect(sustavy_i_fascii_proavlenia_1god, "ежедневная активность: нормальная"), "Нормальная", NA),
-         fasciitis_erythema = ifelse(str_detect(sustavy_i_fascii_proavlenia_1god, "фасциитом: отсутствует"), "Отсутствует", NA)) %>%
-  mutate_at(c('motion_discomfort', 'motion_range', 'contracture', 'motion_activity', 'daily_activity_motion', 'fasciitis_erythema'), as.factor)
-
-trans_outcomes_wrk %>%
-  distinct(polovye_organy_proavlenia_1god) #Только стадия 0 - можно не выносить отдельно
-```
-
-# Проверим структуру данных
-
-```{r include=FALSE}
-summary(trans_outcomes_wrk)
 ```
 
 # Описательная статистика (начало)
@@ -272,8 +177,8 @@ tbl_survfit(efs,
 ```
 
 ## Кумулятивная частота рецидива
+**!!!Несовпадение числа рецидивов!!!**
 ```{r}
-
 
 trans_outcomes_wrk %>%
   select(byl_li_zaregistrirovan_recidiv_progressia_osnovnogo_zabolevania_posle_tkm_1god) %>%
