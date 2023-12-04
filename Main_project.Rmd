@@ -68,17 +68,6 @@ group3 <- df_meta %>% filter(Analysis_group == 3) %>%
 
 df3 <- df %>% select(all_of(group3), pacient) 
 
-# Таблица с названиями и типами переменных
-info_table <- tibble(
-  Variable = names(df3),
-  Format = sapply(df3, function(x) class(x)[1]),
-  First_Value = sapply(df3, function(x) x[1]),
-  Missing_Values_Count = sapply(df3, function(x) sum(is.na(x))),
-  Missing_Values_Percentage = sapply(df3, function(x) mean(is.na(x)) * 100)
-)
-
-missing_data <- info_table %>% filter(Missing_Values_Percentage > 0)
-
 
 # приводим переменные к нужному формату:
 cols_to_fix <- c("fakticeskaa_massa_pred_tkm_epikriz", "cummarnaa_doza_razdelit_na_massu_tela_fakticeskuu_ili_plosad_tela_fakticeskuu",
@@ -252,6 +241,10 @@ df3 <- df3 %>%
 
 df3 <- df3 %>% 
   mutate(summarnaa_doza_pred_tk_me = ifelse(summarnaa_doza_pred_tk_me == ", ", NA, summarnaa_doza_pred_tk_me))
+
+# Удалим колонку о манипуляциях с трансплантатом, указать в описании, что всем с BM трансплантатом проводилось фракционирование
+
+df3 <- df3 %>% select(!manipulacii_s_transplantatom_ptkm)
 ```
 
 
@@ -263,6 +256,45 @@ df3 <- df3 %>% mutate(vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm = case_when(
   str_detect(sovmestimost_donora_recipienta_ptkm_pred_tk_me, "частично") ~ "частично совместимы", TRUE ~ "полностью совместимы"))
 ```
 
+```{r}
+# Создадим отдельный датасет на случай необходимости анализа отдельных препаратов из схем режима кондиционирования и удалим из основного датасета колонки preparaty_rezima_kondicionirovania_pred_tk_me, summarnaa_doza_pred_tk_me
+
+
+# Таблица по дозам и количеству доз препаратов режима кондиционирования
+
+conditioning <- tibble(patient = df3$pacient,
+                       schema = df3$shema_rk_pred_tk_me,
+                       drug = df3$preparaty_rezima_kondicionirovania_pred_tk_me,
+                       dose = df3$summarnaa_doza_pred_tk_me,
+                       bu_dose = df3$cummarnaa_doza_busul_fana)
+
+
+ conditioning <- conditioning %>% 
+  pivot_longer(
+    cols = c(drug, dose),
+    names_to = "variable",
+    values_to = "value",
+    values_drop_na = TRUE
+  ) %>%
+  separate_rows(value, sep = "[,;]\\s*") %>%
+  pivot_wider(names_from = variable, values_from = value) %>% unnest(cols = c(drug, dose))
+
+ 
+ conditioning <- conditioning %>%
+  group_by(patient) %>%
+  mutate(drug_number = row_number()) %>% select(patient, schema, drug_number, drug, dose, bu_dose) %>% mutate(dose = as.numeric(dose)) 
+ 
+ # У пациента 51 терапия не проводилась, у пациента 60 - 2 препарата, внесем корректировки в датасет:
+ 
+ conditioning <- conditioning %>% filter(!(patient == "Patient51")) %>% filter(!(patient == "Patient60" & drug_number == 3))
+ 
+ conditioning <- conditioning %>% mutate(drug = case_when(
+  drug	== "Флударабин" ~ "Флюдарабин",
+  TRUE ~ drug))
+
+ 
+df3 <- df3 %>% select(!c(preparaty_rezima_kondicionirovania_pred_tk_me, summarnaa_doza_pred_tk_me))
+```
 
 
 ### Переменные из группы 4:
@@ -333,44 +365,7 @@ main_df <- Reduce(function(x, y) merge(x, y, by = "pacient", all = TRUE), list_o
 ```
 
 
-### Дополнительные датасеты:
 
-1. Таблица по дозам и количеству доз препаратов режима кондиционирования
-
-```{r  include=FALSE}
-conditioning <- tibble(patient = df3$pacient,
-                       schema = df3$shema_rk_pred_tk_me,
-                       drug = df3$preparaty_rezima_kondicionirovania_pred_tk_me,
-                       dose = df3$summarnaa_doza_pred_tk_me,
-                       bu_dose = df3$cummarnaa_doza_busul_fana)
-
-
- conditioning <- conditioning %>% 
-  pivot_longer(
-    cols = c(drug, dose),
-    names_to = "variable",
-    values_to = "value",
-    values_drop_na = TRUE
-  ) %>%
-  separate_rows(value, sep = "[,;]\\s*") %>%
-  pivot_wider(names_from = variable, values_from = value) %>% unnest(cols = c(drug, dose))
-
- 
- conditioning <- conditioning %>%
-  group_by(patient) %>%
-  mutate(drug_number = row_number()) %>% select(patient, schema, drug_number, drug, dose, bu_dose) %>% mutate(dose = as.numeric(dose)) 
- 
- # У пациента 51 терапия не проводилась, у пациента 60 - 2 препарата, внесем корректировки в датасет:
- 
- conditioning <- conditioning %>% filter(!(patient == "Patient51")) %>% filter(!(patient == "Patient60" & drug_number == 3))
- 
- conditioning <- conditioning %>% mutate(drug = case_when(
-  drug	== "Флударабин" ~ "Флюдарабин",
-  TRUE ~ drug))
-
-
- conditioning
-``` 
 
 ## 3. Описательные статистики
 
