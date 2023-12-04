@@ -1,0 +1,201 @@
+---
+title: "Проект"
+author: "Серебрякова Ольга"
+date: "2023-11-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+Загрузка библиотек
+```{r}
+library('tidyverse')
+library('ggplot2')
+library("readxl")
+library('openxlsx2')
+library("janitor")
+library("psych")
+library("gtsummary")
+library("DT")
+```
+#Чтение данных
+```{r}
+df_meta <- read.csv("names.csv", sep = ";", header = TRUE, fileEncoding = "Windows-1251")
+
+
+df <- openxlsx2::read_xlsx("Donor Immune cells.xlsx", sheet = 1)  
+duplicated_names <- any(duplicated(names(df)))
+
+df <- as_tibble(df, .name_repair = "minimal")
+
+df <- set_names(df, df_meta$cleaned_names)
+
+df <- df %>%
+  mutate(across(where(is.character), ~ gsub("_", " ", .)))
+
+# Исключаем 2 случая с диагнозом мукополисахаридоз и остеопетроз
+
+df <- df %>% filter(!(str_detect(gruppa_diagnozov_po_voz_a_zgem, "Врожденные / наследственные заболевания")))
+
+Donor <- df[, c(1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 105, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121)]
+```
+
+#Предобработка данных
+```{r}
+Donor$gruppa_krovi_donora_ptkm_pred_tk_me_tk_ma <- case_when(
+  Donor$gruppa_krovi_donora_ptkm_pred_tk_me_tk_ma == '0 I' ~ '0 I',
+  Donor$gruppa_krovi_donora_ptkm_pred_tk_me_tk_ma == 'A II' ~ 'A II',
+  Donor$gruppa_krovi_donora_ptkm_pred_tk_me_tk_ma == 'A2 II' ~ 'A II',
+  Donor$gruppa_krovi_donora_ptkm_pred_tk_me_tk_ma == 'B III' ~ 'B III',
+  Donor$gruppa_krovi_donora_ptkm_pred_tk_me_tk_ma == 'AB IV' ~ 'AB IV'
+)
+```
+
+
+```{r}
+library("tibble")
+Donor <- add_column(Donor, male = '', .after = 22)
+
+Donor <- Donor %>%
+  mutate(
+    male <- case_when(harakteristika_donora_ptkm == 'мужчина' ~ '1',
+                               harakteristika_donora_ptkm == 'отец мужчина' ~ '1',  
+                               harakteristika_donora_ptkm == 'отец' ~ '1',
+                               harakteristika_donora_ptkm == 'брат' ~ '1',
+                               harakteristika_donora_ptkm == 'сын' ~ '1',
+                               harakteristika_donora_ptkm == 'женщина' ~ '0',
+                               harakteristika_donora_ptkm == 'мать' ~ '0',
+                               harakteristika_donora_ptkm == 'сестра' ~ '0',
+                               harakteristika_donora_ptkm == 'дочь' ~ '0'))
+
+Donor$male <- Donor$`... <- NULL`
+Donor <- Donor[,-37]
+
+Donor$male <- as.integer(Donor$male)
+```
+
+
+```{r}
+
+Donor <- add_column(Donor, relative = '', .after = 24)
+
+Donor <- Donor %>%
+  mutate(
+    relative <- if_else(harakteristika_donora_ptkm == 'мужчина'|harakteristika_donora_ptkm == 'женщина', "0", "1"))
+
+Donor$relative <- Donor$`... <- NULL` 
+Donor <- Donor[,-38]
+
+Donor$relative <- as.integer(Donor$relative)
+```
+
+```{r}
+Donor$beremennosti_pred_tk_me <- ifelse(Donor$beremennosti_pred_tk_me == 'нет данных', NA, Donor$beremennosti_pred_tk_me)
+```
+
+```{r}
+Donor$donor_vozrast_na_moment_tkm_pred_tk_me_ptkm <- as.integer(stringr::str_extract(Donor$donor_vozrast_na_moment_tkm_pred_tk_me_ptkm, "\\d+"))
+
+```
+
+```{r}
+Donor$virusy_donora_cmv_pred_tk_me <- case_when(
+    grepl("IgG\\(\\+\\)", Donor$virusy_donora_cmv_pred_tk_me) ~ "IgG(+)",
+    !is.na(Donor$virusy_donora_cmv_pred_tk_me) ~ "IgG(-)",
+    .default = NA_character_
+)
+Donor$virusy_donora_ebv_pred_tk_me <- case_when(
+    grepl("IgG\\(\\+\\)", Donor$virusy_donora_ebv_pred_tk_me) ~ "IgG(+)",
+    !is.na(Donor$virusy_donora_ebv_pred_tk_me) ~ "IgG(-)",
+    .default = NA_character_
+)
+Donor$virusy_donora_toxoplassmosis_pred_tk_me <- case_when(
+    grepl("IgG\\(\\+\\)", Donor$virusy_donora_toxoplassmosis_pred_tk_me) ~ "IgG(+)",
+    !is.na(Donor$virusy_donora_toxoplassmosis_pred_tk_me) ~ "IgG(-)",
+    .default = NA_character_
+)
+Donor$virusy_donora_hsv_1_2_pred_tk_me <- case_when(
+    grepl("IgG\\(\\+\\)", Donor$virusy_donora_hsv_1_2_pred_tk_me) ~ "IgG(+)",
+    !is.na(Donor$virusy_donora_hsv_1_2_pred_tk_me) ~ "IgG(-)",
+    .default = NA_character_
+)
+
+Donor <- Donor[,-37]
+
+```
+
+```{r}
+Donor <- Donor %>% mutate(
+    gruppa_krovi_donora_ptkm_pred_tk_me_tk_ma = factor(gruppa_krovi_donora_ptkm_pred_tk_me_tk_ma), rezus_faktor_donora_ptkm_pred_tk_me_tk_ma = factor(rezus_faktor_donora_ptkm_pred_tk_me_tk_ma),
+fenotip_eritrocitov_donora_ptkm_pred_tk_me_tk_ma = factor(fenotip_eritrocitov_donora_ptkm_pred_tk_me_tk_ma),
+male = as.integer(male),
+harakteristika_donora_ptkm = factor(harakteristika_donora_ptkm)
+)
+
+Donor$donor_ves_pred_tkme_ptkm <- str_replace(string = Donor$donor_ves_pred_tkme_ptkm,pattern = "[,]",replacement = ".")
+
+Donor <- Donor %>% mutate(
+  beremennosti_pred_tk_me = as.numeric(beremennosti_pred_tk_me),
+  donor_vozrast_na_moment_tkm_pred_tk_me_ptkm = as.numeric(donor_vozrast_na_moment_tkm_pred_tk_me_ptkm),
+  donor_rost_sm_pred_tk_me_ptkm = as.numeric(donor_rost_sm_pred_tk_me_ptkm),
+  donor_ves_pred_tkme_ptkm = as.numeric(donor_ves_pred_tkme_ptkm)
+)
+```
+
+#Описательные статистики
+
+#Сводная таблица по численным переменным
+
+```{r}
+library(skimr)
+skim(Donor)
+```
+
+```{r}
+Donor %>%
+  select(is.numeric) %>%
+  tbl_summary(
+    type = list( ~ "continuous2"),
+    statistic = ~ c(
+      "{N_nonmiss}","{mean} ({sd})",
+      "{median} ({p25}, {p75})",
+      "{min}, {max}"
+      ),
+    missing_text = "(Missing)"
+  )
+
+```
+#Описательные статистики факторных переменных
+```{r}
+Donor %>%
+  select(is.factor) %>%
+  tbl_summary(
+    statistic = list(
+      all_categorical() ~ "{n} / {N} ({p}%)"
+    ),
+    missing_text = "(Missing)"
+  )
+```
+
+```{r}
+Donor %>%
+  select(is.integer) %>%
+  tbl_summary(
+    type = all_continuous() ~ "continuous2",
+    statistic = list(
+      all_continuous() ~ "{n} / {N} ({p}%)"
+    ),
+    missing_text = "(Missing)"
+  )
+```
+#Количество пропущенных значений:
+```{r}
+na <- as.data.frame(t(Donor %>% summarise(across(everything(), ~ sum(is.na(.))))))
+na <- na %>% 
+       rename("NA" = "V1")
+datatable(na)
+
+```
+
+
