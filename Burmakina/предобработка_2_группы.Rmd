@@ -1,0 +1,220 @@
+---
+title: "processing_2"
+author: "Polina Burmakina"
+date: "2023-11-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(openxlsx2)
+library(dbplyr)
+library(readr)
+library(tidyr)
+library(lubridate)
+library(stringr)
+library(psych)
+
+```
+
+## Импорт данных
+
+```{r}
+metadata <- read.csv("names.csv", sep = ";", header = TRUE, fileEncoding = "Windows-1251")
+
+
+df <- openxlsx2::read_xlsx("Donor Immune cells.xlsx", sheet = 1)  
+duplicated_names <- any(duplicated(names(df)))
+
+df <- as_tibble(df, .name_repair = "minimal")
+
+data <- set_names(df, metadata$cleaned_names)
+
+```
+
+# Рассмотрим группу 2 
+
+```{r}
+data <- data %>% filter(!(str_detect(gruppa_diagnozov_po_voz_a_zgem, "Врожденные / наследственные заболевания"))) 
+
+group2 <- metadata %>% filter(Analysis_group == 2) %>% 
+                      select(cleaned_names) %>% pull()
+
+
+all_group2 <- data%>% select(all_of(group2)) 
+ncol(all_group2)
+
+```
+
+# Уберем лишние и неудобные переменные 
+```{r}
+all_group2 <- all_group2 %>%
+  mutate(
+    intratekalnoe_vvedenie = ifelse(grepl("^да", intratekal_noe_vvedenie_preparatov_da_net_data_preparaty_dozy_pred_tk_me), "да", ifelse(grepl("^нет", intratekal_noe_vvedenie_preparatov_da_net_data_preparaty_dozy_pred_tk_me), "нет", NA)),
+    date_intratekalnoe_vvedenie = str_extract(intratekal_noe_vvedenie_preparatov_da_net_data_preparaty_dozy_pred_tk_me, "\\d{2}\\.\\d{2}\\.\\d{4}") %>% str_trim()) 
+
+
+cleaned_group2 <- all_group2 %>% 
+  select( -voz_klassifikacia_a_zgem, -gruppa_diagnozov_po_voz_a_zgem, # подробные диагнозы
+          -diagnoz_diag_stac, -diagnoz_ico3_who_2016,
+          -ves_pacienta,
+          -s_tela_fakticeskaa_pred_tk_me,
+          -restadirovanie_na_moment_tkm_mob_pred_tk_me,  
+          -restadirovanie_na_moment_tkm_utocnenia_pred_tk_me,
+          -restadirovanie_na_moment_tkm_dopolnenia_pred_tk_me,  
+          -virusy_pacienta_hv6_pred_tk_me,
+          -virusy_pacienta_f_50_pred_tk_me,
+          -virusy_pacienta_hcv_pred_tk_me,
+          -virusy_pacienta_hbv_pred_tk_me,
+          -data_predydusej_tkm_tk_ma,  
+          -vid_predydusej_tkm_tk_ma,
+          -infekcionnye_osloznenia,
+          -istocnik_predydusej_tkm_tk_ma,
+          -pokazania_k_povtornoj_tkm_pred_tk_me,  
+          -intratekal_noe_vvedenie_preparatov_da_net_data_preparaty_dozy_pred_tk_me,
+          -date_intratekalnoe_vvedenie
+          )
+ncol(cleaned_group2)
+
+```
+
+
+## Типы данных
+```{r warning=FALSE}
+cleaned_types <- cleaned_group2 %>% mutate(across(c(pacient,
+                                             d_z,
+                                             pol,
+                                             obsee_kolicestvo_tkm,
+                                             vozrastnaa_gruppa,
+                                             dannoe_zabolevanie_pervicnoe_da_net_a_zgem,
+                                             gruppa_krovi_pred_tk_me,
+                                             rezus_faktor_pred_tk_me,
+                                             fenotip_eritrocitov_pred_tk_me,
+                                             zaklucenie_norma_izbytocnaa_massa_tela,
+                                             gruppa_pred_tk_me,
+                                             vozrastnaa_gruppa
+                                             ),~ as.factor(.x))) %>%
+  
+  mutate(indeks_massy_tela = gsub(",",".", indeks_massy_tela)) %>%
+  mutate(across(c(klirens_kreatinina_pred_tk_me,
+                  karnovskij_pered_tkm_pred_tk_me,
+                  massa_tela_na_moment_tkm_ptkm,
+                  indeks_massy_tela,
+                  uroven_ferritina_pred_tk_me), ~ as.numeric(.x)))
+
+```
+
+## Упорядочим простые столбцы, заполненим понятные пропуски
+```{r}
+
+simplier <- cleaned_types %>%
+  mutate(
+    pacient = gsub("Patient", "", pacient),
+   vozrastnaa_gruppa = case_when(
+  vozrast_polnyh_let_na_moment_tkm < 18  ~ "< 18",
+  vozrast_polnyh_let_na_moment_tkm >= 18 & vozrast_polnyh_let_na_moment_tkm < 50 ~ "18-50",
+  vozrast_polnyh_let_na_moment_tkm >= 50 ~ "50+" ),
+    dannoe_zabolevanie_pervicnoe_da_net_a_zgem = gsub("вторичное", "нет", dannoe_zabolevanie_pervicnoe_da_net_a_zgem),
+    gruppa_pred_tk_me = gsub("высокого риска", "Standart", gruppa_pred_tk_me),
+    gruppa_pred_tk_me = gsub("высокая группа риска", "Standart", gruppa_pred_tk_me),
+  karnovskij_pered_tkm_pred_tk_me = case_when( karnovskij_pered_tkm_pred_tk_me < 80 ~ "менее 80",
+                                               karnovskij_pered_tkm_pred_tk_me >= 80 ~ "80+"))
+    
+simplier$vozrastnaa_gruppa <- as.factor(simplier$vozrastnaa_gruppa)
+
+# выражение из имт массы 
+nan_weight <- function( indeks_massy_tela, rost_na_moment_tkm_pred_tk_me) {
+  weight <- indeks_massy_tela * (rost_na_moment_tkm_pred_tk_me/100)^2
+  return(weight)
+}
+
+# заполним пропуски
+simplier$massa_tela_na_moment_tkm_ptkm[is.na(simplier$massa_tela_na_moment_tkm_ptkm)] <- nan_weight(simplier$indeks_massy_tela[is.na(simplier$massa_tela_na_moment_tkm_ptkm)], simplier$rost_na_moment_tkm_pred_tk_me[is.na(simplier$massa_tela_na_moment_tkm_ptkm)]) 
+
+# Округлим кое-где
+simplier <- simplier %>% 
+  mutate_at(c("massa_tela_na_moment_tkm_ptkm", "klirens_kreatinina_pred_tk_me","rost_na_moment_tkm_pred_tk_me","uroven_ferritina_pred_tk_me",
+              "serdecnyj_vybros_pred_tk_me", "indeks_massy_tela"), ~round(., 0))
+
+# дополнили очевидные NA по информации из соседних столбцов
+levels(simplier$d_z) <- c(levels(simplier$d_z), "OMЛ")
+
+simplier$d_z[19] <- "OMЛ"
+simplier$d_z[29] <- "ЮММЛ"
+simplier$d_z[30] <- "ОЛЛ"
+simplier$d_z[33] <- "ОЛЛ"
+
+# немножко унифицировали рестадирование
+
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[93] <- NA
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[69] <- NA
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[62] <- NA
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[59] <- NA
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[15] <- NA
+
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[82] <- "стадия_IIIB"
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[13] <- "DIPSS"
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[25] <- "DIPSS"
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[5] <- "рецидив"
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[11] <- "ОМЛ"
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[66] <- "ОМЛ"
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[61] <- NA
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[38] <- "РАИБ2"
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[67] <- "РАИБ1"
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[21] <- "ремиссия"
+
+
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("хроническая_фаза", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("DIPSS", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("ОМЛ", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("РАИБ1", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("РАИБ2", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("бластный_криз", "рецидив", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("прогрессия", "рецидив", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
+simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("стадия_IIIB", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
+
+
+
+simplier <- simplier %>%
+  mutate_at(vars(starts_with("virusy")), ~ifelse(grepl("IgG\\(\\+\\)", .), "IgG(+)",
+                                                   ifelse(grepl("IgG\\(\\-\\)", .), "IgG(-)", NA))) 
+ 
+simplier$gruppa_krovi_pred_tk_me <- gsub("_", " ", simplier$gruppa_krovi_pred_tk_me)
+simplier$data_diagnoza_az_gem[68] <- NA
+simplier$restadirovanie_na_moment_tkm_data_pred_tk_me[68] <- NA
+
+
+# дочистим типы
+numerics <- sapply(simplier, is.numeric)
+simplier[, !numerics & names(simplier) !="pacient"] <- lapply(simplier[, !numerics & names(simplier) !="pacient"], as.factor)
+
+```
+
+# Почищенная 2я группа!
+```{r}
+group2_for_analysis <- simplier
+
+```
+
+## Cтатистики
+### Первый взгляд на факторные переменные
+```{r}
+factors <- sapply(group2_for_analysis, is.factor)
+facts_data <- group2_for_analysis[, factors]
+summary(facts_data)
+```
+### Первый взгляд на численные переменные
+```{r}
+nums <- sapply(group2_for_analysis, is.numeric)
+nums_data <- group2_for_analysis[, nums]
+describe(nums_data, ranges = TRUE)
+```
+
+
+
+
