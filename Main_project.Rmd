@@ -31,7 +31,7 @@ library(dbplyr)
 
 ```{r}
 
-df_meta <- read.csv("names.csv", sep = ";", header = TRUE, fileEncoding = "Windows-1251")
+df_meta <- read.csv("names.csv", sep = ",", header = TRUE, fileEncoding = "UTF-8")
 
 
 df <- openxlsx2::read_xlsx("Donor Immune cells (1).xlsx", sheet = 1)  
