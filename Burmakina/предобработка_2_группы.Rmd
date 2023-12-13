@@ -45,10 +45,7 @@ data <- data %>% filter(!(str_detect(gruppa_diagnozov_po_voz_a_zgem, "Врожд
 group2 <- metadata %>% filter(Analysis_group == 2) %>% 
                       select(cleaned_names) %>% pull()
 
-
 all_group2 <- data%>% select(all_of(group2)) 
-ncol(all_group2)
-
 ```
 
 # Уберем лишние и неудобные переменные 
@@ -156,28 +153,19 @@ simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[69] <- NA
 simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[62] <- NA
 simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[59] <- NA
 simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[15] <- NA
-
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[82] <- "стадия_IIIB"
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[13] <- "DIPSS"
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[25] <- "DIPSS"
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[5] <- "рецидив"
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[11] <- "ОМЛ"
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[66] <- "ОМЛ"
 simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[61] <- NA
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[38] <- "РАИБ2"
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[67] <- "РАИБ1"
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me[21] <- "ремиссия"
 
+patterns_to_remissiya <- c('хроническая фаза','трансфрмация в ОМЛ, ремиссия','DIPSS 2-3, фиброзно-склеротическая стадия', 'РАИБ 2', 'DIPSSplus промежуточный-2 риск', 'РАИБ-2, очень высокий риск IPSS-R','РАИБ1, IPSS-R', 'стадия IIIB', 'стадия IIIB, ремиссия')
+patterns_to_recidiv <- c('бластный криз', 'прогрессия', 'прогрессия в ОМЛ', 'рецидив, циторедукция')
+new_values <- c('ремиссия', 'рецидив')
 
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("хроническая_фаза", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("DIPSS", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("ОМЛ", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("РАИБ1", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("РАИБ2", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("бластный_криз", "рецидив", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("прогрессия", "рецидив", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
-simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me <- gsub("стадия_IIIB", "ремиссия", simplier$restadirovanie_na_moment_tkm_stadia_pred_tk_me)
-
+# Заменяем значения в столбце в зависимости от паттерна
+simplier <- simplier %>%
+  mutate(restadirovanie_na_moment_tkm_stadia_pred_tk_me = case_when(
+    str_detect(restadirovanie_na_moment_tkm_stadia_pred_tk_me, paste(patterns_to_recidiv, collapse = '|')) ~ new_values[2],
+    str_detect(restadirovanie_na_moment_tkm_stadia_pred_tk_me, paste(patterns_to_remissiya, collapse = '|')) ~ new_values[1],
+    TRUE ~ restadirovanie_na_moment_tkm_stadia_pred_tk_me
+  ))
 
 
 simplier <- simplier %>%
@@ -188,6 +176,8 @@ simplier$gruppa_krovi_pred_tk_me <- gsub("_", " ", simplier$gruppa_krovi_pred_tk
 simplier$data_diagnoza_az_gem[68] <- NA
 simplier$restadirovanie_na_moment_tkm_data_pred_tk_me[68] <- NA
 
+simplier$pol <- gsub("Женский", "0",simplier$pol ) %>% as.factor
+simplier$pol <- gsub("Мужской", "1", simplier$pol) %>% as.factor
 
 # дочистим типы
 numerics <- sapply(simplier, is.numeric)
