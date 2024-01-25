@@ -6,7 +6,7 @@ Polina Burmakina
 - Statistics for the outcomes
 
 ``` r
-main_df %>%
+tab1 <- main_df %>%
   select(os2, os2time, 
          rel2, rel2time, 
          compete2, compete2time, 
@@ -17,6 +17,7 @@ main_df %>%
     all_continuous() ~ "{median} ({p25}, {p75})",
     all_categorical() ~ "{n} ({p}%)"),
     missing = "no")
+print(tab1)
 ```
 
 <div id="delybewbnc" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
@@ -470,7 +471,7 @@ main_df %>%
 - Statistics for predictors used in the 0-model
 
 ``` r
-main_df %>%
+tab2 <- main_df %>%
   select(d_z, restadirovanie_na_moment_tkm_stadia_pred_tk_me,  
          vozrast_polnyh_let_na_moment_tkm, vozrastnaa_gruppa, 
          sovmestimost_donora_recipienta_ptkm_pred_tk_me, 
@@ -481,6 +482,7 @@ main_df %>%
     all_continuous() ~ "{median} ({p25}, {p75})",
     all_categorical() ~ "{n} ({p}%)"), 
     missing = "no")
+print(tab2)
 ```
 
 <div id="febcoyoeie" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
@@ -936,7 +938,7 @@ main_df %>%
 - Statistics for potential predictors
 
 ``` r
-main_df %>% 
+tab3 <- main_df %>% 
   select(matches("^cd.*_abs$")) %>% 
   
   
@@ -944,6 +946,7 @@ main_df %>%
     all_continuous() ~ "{median} ({p25}, {p75})",
     all_categorical() ~ "{n} ({p}%)"), 
     missing = "no")
+print(tab3)
 ```
 
 <div id="nsgxyivfla" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
@@ -1380,7 +1383,7 @@ main_df %>%
   vis_miss() 
 ```
 
-![](статистика_пропусков_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](unnamed-chunk-5-1.png)<!-- -->
 
 - Missing values in outcomes
 
@@ -1395,6 +1398,6 @@ main_df %>%
   vis_miss()
 ```
 
-![](статистика_пропусков_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](unnamed-chunk-6-1.png)<!-- -->
 
 Missing values about 3%
