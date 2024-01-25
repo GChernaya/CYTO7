@@ -1,0 +1,134 @@
+---
+title: "Descriptive statistics"
+author: "Polina Burmakina"
+date: "2024-01-16"
+output:  rmarkdown::github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readr)
+library(readxl)
+library(gtsummary)
+library(stringr)
+library(janitor)
+library(openxlsx2)
+library(tidyr)
+library(lubridate)
+library(ggplot2)
+library(survival)
+library(ggsurvfit)
+library(tidycmprsk)
+library(psych)
+library(DT)
+library(dbplyr)
+library(labelled)
+library(skimr)
+library(naniar)
+library(visdat)
+library(survminer)
+
+
+main_df <- read_csv('main_df.csv')
+
+```
+
+```{r, include=FALSE}
+df_meta <- read.csv("NAMES.csv", sep = ",", header = TRUE, fileEncoding = "UTF-8")
+
+describtion_to_use <- data.frame(names = names(main_df)) %>%  
+  left_join(., df_meta %>% select(cleaned_names, Describtion), 
+            by = c("names" = "cleaned_names")) %>% 
+  mutate(Describtion = case_when(
+    names == "cummarnaa_doza_busulfana_razdelit_na_massu_tela" ~ "Суммарная доза Бусульфана разделить на массу тела", 
+    names == "male" ~ "Пол (М - 1, Ж - 0)",
+    names == "relative" ~ "Родственный донор (Да - 1, Нет - 0)",
+    names == "intratekalnoe_vvedenie" ~ "Интретекатльное введение",
+    names == "cvk_not_sterile" ~ "Высевы из ЦВК + (Да - 1, Нет - 0)",	
+    names == "cvk_vysev_type" ~ "Высевы из ЦВК: заключение",
+    TRUE ~ Describtion
+  ))
+
+var_labels_to_use <- setNames(as.list(describtion_to_use$Describtion), describtion_to_use$names)
+main_df <- main_df %>%
+  set_variable_labels(.labels = var_labels_to_use, .strict = FALSE)
+
+
+```
+
+
+
+* Statistics for the outcomes
+```{r}
+
+main_df %>%
+  select(os2, os2time, 
+         rel2, rel2time, 
+         compete2, compete2time, 
+         efs2, efs2time, 
+         a_gvhd24, a_gvhd24time, 
+         c_gvhd, c_gvh_dtime) %>%
+  tbl_summary(statistic = list(
+    all_continuous() ~ "{median} ({p25}, {p75})",
+    all_categorical() ~ "{n} ({p}%)"),
+    missing = "no")
+
+```
+    
+
+
+
+* Statistics for predictors used in the 0-model 
+```{r}
+main_df %>%
+  select(d_z, restadirovanie_na_moment_tkm_stadia_pred_tk_me,  
+         vozrast_polnyh_let_na_moment_tkm, vozrastnaa_gruppa, 
+         sovmestimost_donora_recipienta_ptkm_pred_tk_me, 
+         rezim_kondicionirovania_pred_tk_me, 
+         vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm, 
+         cd34_kg_x10_ptkm_pdi) %>%
+  tbl_summary(statistic = list(
+    all_continuous() ~ "{median} ({p25}, {p75})",
+    all_categorical() ~ "{n} ({p}%)"), 
+    missing = "no")
+
+```
+
+* Statistics for potential predictors
+```{r}
+main_df %>% 
+  select(matches("^cd.*_abs$")) %>% 
+  
+  
+  tbl_summary(statistic = list(
+    all_continuous() ~ "{median} ({p25}, {p75})",
+    all_categorical() ~ "{n} ({p}%)"), 
+    missing = "no")
+  
+```
+
+##  Do we have missing values in the data used to build the model?
+
+* Missing values in potential predictors
+```{r}
+main_df %>%
+  select(matches("^cd.*_abs$")) %>% 
+  vis_miss() 
+  
+```
+
+
+* Missing values in outcomes
+```{r}
+main_df %>%
+  select(os2, os2time, 
+         rel2, rel2time, 
+         compete2, compete2time, 
+         efs2, efs2time, 
+         a_gvhd24, a_gvhd24time, 
+         c_gvhd, c_gvh_dtime) %>%
+  vis_miss()
+```
+
+Missing values about 3%
