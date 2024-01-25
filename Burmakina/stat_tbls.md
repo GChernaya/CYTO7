@@ -1380,7 +1380,7 @@ main_df %>%
   vis_miss() 
 ```
 
-![](/unnamed-chunk-5-1.png)<!-- -->
+![](Burmakina/unnamed-chunk-5-1.png)<!-- -->
 
 - Missing values in outcomes
 
@@ -1395,6 +1395,6 @@ main_df %>%
   vis_miss()
 ```
 
-![](/unnamed-chunk-6-1.png)<!-- -->
+![](Burmakina/unnamed-chunk-6-1.png)<!-- -->
 
 Missing values about 3%
