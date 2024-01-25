@@ -73,7 +73,7 @@ main_df %>%
     all_continuous() ~ "{median} ({p25}, {p75})",
     all_categorical() ~ "{n} ({p}%)"),
     missing = "no")
-
+#tab1
 ```
     
 
@@ -92,7 +92,7 @@ main_df %>%
     all_continuous() ~ "{median} ({p25}, {p75})",
     all_categorical() ~ "{n} ({p}%)"), 
     missing = "no")
-
+#tab2
 ```
 
 * Statistics for potential predictors
@@ -105,7 +105,7 @@ main_df %>%
     all_continuous() ~ "{median} ({p25}, {p75})",
     all_categorical() ~ "{n} ({p}%)"), 
     missing = "no")
-  
+  #tab3
 ```
 
 ##  Do we have missing values in the data used to build the model?
@@ -115,11 +115,9 @@ main_df %>%
 main_df %>%
   select(matches("^cd.*_abs$")) %>% 
   vis_miss() 
-  
+#5-1
 ```
-```{r}
-![](/unnamed-chunk-5-1.png)
-```
+
 
 * Missing values in outcomes
 ```{r}
@@ -131,9 +129,8 @@ main_df %>%
          a_gvhd24, a_gvhd24time, 
          c_gvhd, c_gvh_dtime) %>%
   vis_miss()
+#6-1
 ```
-```{r}
-![](/unnamed-chunk-6-1.png)
-```
+
 
 Missing values about 3%
