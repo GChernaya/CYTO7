@@ -1,0 +1,171 @@
+---
+title: "models & bootstrap"
+author: "Polina Burmakina"
+date: "2024-01-25"
+output: rmarkdown::github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readr)
+library(readxl)
+library(gtsummary)
+library(stringr)
+library(janitor)
+library(openxlsx2)
+library(tidyr)
+library(lubridate)
+library(ggplot2)
+library(survival)
+library(ggsurvfit)
+library(tidycmprsk)
+library(psych)
+library(DT)
+library(dbplyr)
+library(labelled)
+library(skimr)
+library(naniar)
+library(visdat)
+library(rms)
+library(boot)
+
+main_df <- read_csv('main_df.csv')
+```
+
+```{r, include=FALSE}
+df_meta <- read.csv("NAMES.csv", sep = ",", header = TRUE, fileEncoding = "UTF-8")
+
+describtion_to_use <- data.frame(names = names(main_df)) %>%  
+  left_join(., df_meta %>% select(cleaned_names, Describtion), 
+            by = c("names" = "cleaned_names")) %>% 
+  mutate(Describtion = case_when(
+    names == "cummarnaa_doza_busulfana_razdelit_na_massu_tela" ~ "Суммарная доза Бусульфана разделить на массу тела", 
+    names == "male" ~ "Пол (М - 1, Ж - 0)",
+    names == "relative" ~ "Родственный донор (Да - 1, Нет - 0)",
+    names == "intratekalnoe_vvedenie" ~ "Интретекатльное введение",
+    names == "cvk_not_sterile" ~ "Высевы из ЦВК + (Да - 1, Нет - 0)",	
+    names == "cvk_vysev_type" ~ "Высевы из ЦВК: заключение",
+    TRUE ~ Describtion
+  ))
+
+var_labels_to_use <- setNames(as.list(describtion_to_use$Describtion), describtion_to_use$names)
+main_df <- main_df %>%
+  set_variable_labels(.labels = var_labels_to_use, .strict = FALSE)
+
+
+```
+
+##  Models 
+```{r, include=FALSE}
+main_df <- main_df %>%
+  mutate(
+    os2 = as.numeric(os2),
+    rel2 = as.numeric(rel2),
+    compete2 = as.numeric(compete2),
+    efs2 = as.numeric(efs2),
+    a_gvhd24 = as.numeric(a_gvhd24),
+    c_gvhd = as.numeric(c_gvhd)
+  )
+```
+
+
+* Model-loop that outputs null models
+```{r, warning=FALSE}
+# outcome & time
+variable_list <- c("os2", "os2time", 
+                   "rel2", "rel2time", 
+                   "compete2", "compete2time", 
+                   "efs2", "efs2time", 
+                   "a_gvhd24", "a_gvhd24time", 
+                   "c_gvhd", "c_gvh_dtime")
+
+# null model predictors
+zero_predictors <- c("d_z", "restadirovanie_na_moment_tkm_stadia_pred_tk_me",  
+                    "vozrast_polnyh_let_na_moment_tkm", "vozrastnaa_gruppa", 
+                    "sovmestimost_donora_recipienta_ptkm_pred_tk_me", 
+                    "rezim_kondicionirovania_pred_tk_me", 
+                    "vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm", 
+                    "cd3_kg_ptkm_pdi", "cd34_kg_x10_ptkm_pdi")
+
+
+formula_list <- map2(variable_list[seq(1, length(variable_list), 2)], 
+                     variable_list[seq(2, length(variable_list), 2)], 
+                     ~paste("Surv", "(", .y, ",", .x, ")", "~", paste(zero_predictors, collapse = " + ")))
+
+model_list <- map(formula_list, ~coxph(as.formula(.x), data = main_df))
+
+map2(model_list, formula_list, ~{print(summary(.x)$concordance); cat("Модель для", .y, "\n\n")})
+```
+
+
+## Model for eventless mortality
+
+```{r, warning=FALSE}
+
+
+zero_predictors <- c("d_z", "restadirovanie_na_moment_tkm_stadia_pred_tk_me",  
+                    "vozrast_polnyh_let_na_moment_tkm", "vozrastnaa_gruppa", 
+                    "sovmestimost_donora_recipienta_ptkm_pred_tk_me", 
+                    "rezim_kondicionirovania_pred_tk_me", 
+                    "vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm", 
+                     "cd34_kg_x10_ptkm_pdi")
+
+additional_predictors <- c("cd3_abs", "cd4_abs", "cd8_abs", "cd19_abs", "cd56_abs", "cd16_abs", "cd56cd16_abs", "cd4cd8_abs", "cd3cd56_abs")
+
+
+model_formula_base <- as.formula(paste("Surv(time= compete2time, event = ifelse(compete2==1,1,0)) ~", paste(zero_predictors, collapse = " + ")))
+fit_base <- coxph(model_formula_base, data = main_df)
+
+
+models_with_additional <- lapply(additional_predictors, function(pred) {
+  model_formula <- update(model_formula_base, paste(". ~ . +", pred))
+  fit <- coxph(model_formula, data = main_df)
+  return(list(predictor = pred, model = fit))
+})
+
+
+cat("Base model:\n")
+print(summary(fit_base)$concordance)
+
+lapply(models_with_additional, function(model) {
+  cat("\nModel with additional predictor:", model$predictor, "\n")
+  print(summary(model$model)$concordance)
+})
+
+```
+* A loop that outputs bootstrap results and confidence intervals (10 models for one outcome - null and models with +1 new predictor)
+
+```{r, warning=FALSE}
+
+# concordance function
+concordance_function <- function(data, indices, formula) {
+  d <- data[indices,] 
+  fit <- coxph(formula, data = d) 
+  return(summary(fit)$concordance) 
+}
+
+formulas <- c(model_formula_base, 
+              lapply(models_with_additional, function(model) update(model_formula_base, paste(". ~ . +", model$predictor))))
+
+# bootstrap
+bootobjects <- lapply(formulas, function(formula) {
+  boot(data = main_df, statistic = concordance_function, R = 100, formula = formula)
+})
+
+
+lapply(seq_along(bootobjects), function(i) {
+  cat("\nModel with additional predictor:", 
+      if (i == 1) "Base model" else models_with_additional[[i-1]]$predictor, "\n")
+  
+  cat("Bootstrap Results:\n")
+  print(bootobjects[[i]])
+  
+  cat("\n95% Confidence Interval (BCa method):\n")
+  print(boot.ci(bootobjects[[i]], type = "bca"))
+  cat("\n")
+})
+
+```
+
