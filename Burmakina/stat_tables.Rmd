@@ -118,7 +118,7 @@ main_df %>%
   
 ```
 ```{r}
-![](/unnamed-chunk-5-1/png)
+![](/unnamed-chunk-5-1.png)
 ```
 
 * Missing values in outcomes
@@ -133,7 +133,7 @@ main_df %>%
   vis_miss()
 ```
 ```{r}
-![](/unnamed-chunk-6-1/png)
+![](/unnamed-chunk-6-1.png)
 ```
 
 Missing values about 3%
