@@ -1,0 +1,688 @@
+---
+title: "PCA"
+author: "Galina Chernaya"
+date: "`r Sys.Date()`"
+output:  html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(ggplot2)
+library(factoextra)
+library(pheatmap)
+library(FactoMineR)
+library(ggbiplot)
+library(tidymodels)
+library(embed)
+library(GGally)
+library(FactoMineR)
+library(missMDA)
+library(ggpubr)
+library(readr)
+library(labelled)
+library(naniar)
+library(VIM)
+library(gtsummary)
+
+library(cluster)
+```
+
+
+```{r include=FALSE}
+
+# Перевод в факторные оставшихся переменных
+main_df <- read_csv("main_df.csv")
+
+df_meta <- read.csv("names.csv", sep = ",", header = TRUE, fileEncoding = "UTF-8")
+
+guess_encoding("names.csv")
+
+describtion <- data.frame(names = names(main_df)) %>%  
+  left_join(., df_meta %>% select(cleaned_names, Describtion), 
+            by = c("names" = "cleaned_names")) %>% mutate(Describtion = case_when(
+              names == "cummarnaa_doza_busulfana_razdelit_na_massu_tela" ~ "Суммарная доза Бусульфана разделить на массу тела", 
+              names == "male" ~ "Пол (М - 1, Ж - 0)",
+              names == "relative" ~ "Родственный донор (Да - 1, Нет - 0)",
+              names == "intratekalnoe_vvedenie" ~ "Интретекатльное введение",
+              names == "cvk_not_sterile" ~ "Высевы из ЦВК + (Да - 1, Нет - NA)",	
+              names == "cvk_vysev_type" ~ "Высевы из ЦВК: заключение",
+              TRUE ~ Describtion
+            ))
+  
+
+
+
+var_labels <- setNames(as.list(describtion$Describtion), describtion$names)
+
+
+ 
+ main_df <- main_df %>%
+    set_variable_labels(.labels = var_labels, .strict = FALSE)
+var_label(main_df) 
+library(gt)
+
+main_df %>% colnames()   
+main_df %>% select(pacient, data_tkm_iz_protokola_ptkm_pdi, data_poslednego_kontakta, os2, compete2, ortph_da_net_tpp_100dn) %>% mutate( 
+  data_tkm_iz_protokola_ptkm_pdi = as.Date(data_tkm_iz_protokola_ptkm_pdi, format = "%d.%m.%Y"), 
+  data_poslednego_kontakta = as.Date(data_poslednego_kontakta, format = "%d.%m.%Y")) %>% mutate(date_diff = difftime(data_tkm_iz_protokola_ptkm_pdi, data_poslednego_kontakta, units = "days")) -> follow_up
+                                                                                         
+follow_up %>% filter(compete2 == 0)
+
+# 5_(2020), 70(2022), 78(2023.08 - cens), 79(2022), 81(2023 - cens), 88 (2022), 96(2022)
+
+main_df %>% filter(pacient %in% c(70, 81, 93, 96)) 
+```
+
+```{r include=FALSE}
+main_df %>% select(where(is.character))
+
+variables_to_convert <- c("male", 
+            "relative", 
+            "beremennosti_pred_tk_me", 
+            "obsee_kolicestvo_tkm", 
+            "poradkovyj_nomer_nastoasej_transplantacii_ptkm_pditkm", 
+            "koza_stepen_1god",
+            "slizistaa_polosti_rta_stepen_1god",
+            "glaza_stepen_1god",
+            "zkt_stepen_1god", 
+            "pecen_stepen_1god",
+            "legkie_stepen_1god",
+            "sustavy_i_fascii_stepen_1god",
+            "polovye_organy_stepen_1god",
+            "summarnaa_stepen_tazesti_hrtph_1god",
+            "monoklonal_nye_antitela_pred_tk_me",
+            "vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm",
+            "virusy_donora_cmv_pred_tk_me",
+            "virusy_donora_ebv_pred_tk_me", 
+            "virusy_donora_toxoplassmosis_pred_tk_me",
+            "rezim_kondicionirovania_pred_tk_me",
+            "shema_rk_pred_tk_me",
+            "preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me",
+            "vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm",
+            "sovmestimost_donora_recipienta_ptkm_pred_tk_me",
+            "istocnik_pred_tk_me_ptkm_pdi",
+            "ottorzenie_tpp_100dn")
+
+variables_to_convert <- unique(variables_to_convert)
+
+main_df[variables_to_convert] <- lapply(main_df[variables_to_convert], factor)
+main_df %>% select(where(is.character))
+
+to_fix <- c("nc_ptkm_pdi", "cd34_kg_x10_ptkm_pdi", "cummarnaa_doza_busulfana_razdelit_na_massu_tela", "fakticeskaa_massa_pred_tkm_epikriz")
+main_df[to_fix] <- lapply(main_df[to_fix], function(x) as.numeric(gsub(",", ".", x)))
+
+main_df %>% select(!where(is.character)) -> main_df1
+
+  
+```
+
+# Анализ главных компонент для количественных характеристик трансплантата, донора и пациента (поиск потенциальных предикторов) 
+
+
+
+```{r include=FALSE} 
+## Выбор переменных для PCA:
+# удаляем исходы, дублирующие и обобщающие переменные:
+ #main_df1 %>% colnames()
+
+main_df1 %>% select(1:56) %>% select(where(is.numeric)) %>% 
+  select(!c(vozrast_donora, 
+            vozrast_polnyh_let_na_moment_tkm,
+            donor_vozrast_na_moment_tkm_pred_tk_me_ptkm,
+            massa_tela_na_moment_tkm_ptkm, 
+            rost_na_moment_tkm_pred_tk_me,
+            cummarnaa_doza_busul_fana,
+            cd34_kg_x10_ptkm_pdi,
+            wbc,
+            donor_rost_sm_pred_tk_me_ptkm,                  
+            donor_ves_pred_tkme_ptkm,
+            indeks_massy_tela,
+            fakticeskaa_massa_pred_tkm_epikriz)) %>% 
+  select(!contains("_perc")) %>% select(!(1:2)) -> pca_df
+
+names_n <- c("lymphocytes", "cd3_abs", "cd4_abs", "cd8_abs", "cd19_abs", "cd56_abs", "cd16_abs", "cd56cd16_abs", "cd4cd8_abs", "cd3cd56_abs", "cardiac_out",
+             "creatinine_clearence", "ferritin", "NC","cd3_kg",
+  "busulfan_dose")
+pca_df <- setNames(pca_df, names_n)
+
+```
+
+
+
+
+
+```{r include=FALSE}
+## Расчет главных компонент:
+#data_labels <- sapply(pca_df, var_label) 
+#pca_df_lab <- setNames(pca_df, data_labels)
+
+pca_df.pca <- prcomp(na.omit(pca_df), scale = T) 
+
+```
+
+
+
+## Визуализация Cumulative Proportion:
+
+
+
+```{r echo = FALSE}
+
+
+fviz_eig(pca_df.pca, addlabels = T, ylim = c(0, 30))
+
+```
+
+64.5 % вариативности данных обьясняются первыми пятью главными компонентами, больше 10 % вариативности обьясняют первые 3 главные компоненты: 
+
+
+```{r echo = FALSE}
+
+fviz_contrib(pca_df.pca, choice = "var", axes = 1, top = 10) + theme_bw()  +
+         theme(axis.text.x = element_text(angle=-90))
+fviz_contrib(pca_df.pca, choice = "var", axes = 2, top = 10)  +
+         theme_bw()  +
+         theme(axis.text.x = element_text(angle=-90))  # 2
+fviz_contrib(pca_df.pca, choice = "var", axes = 3, top = 10)  +
+         theme_bw()  +
+         theme(axis.text.x = element_text(angle=-90))  # 3
+
+
+```
+
+```{r include=FALSE}
+fviz_pca_var(pca_df.pca, col.var = "contrib", labelsize = 2)
+fviz_pca_var(pca_df.pca, axes = c(2, 3), col.var = "contrib", labelsize = 2)
+```
+
+Основные составляющие главных компонент: 
+
+
+Можно выделить 6 переменных, которые вносят наибольший вклад в главные компоненты: 
+
+
+```{r echo=FALSE}
+fviz_pca_var(pca_df.pca, 
+             select.var = list(contrib = 6),  
+             col.var = "contrib")
+
+fviz_pca_var(pca_df.pca, 
+             select.var = list(contrib = 6),
+             axes = c(2, 3), 
+             col.var = "contrib")
+
+
+```
+
+
+
+## Кластеры на основе данных PCA
+
+```{r echo=FALSE}
+res <- pca_df.pca$x
+
+wss <- (nrow(res)-1)*sum(apply(res,2,var))
+for (i in 1:15) wss[i] <- sum(kmeans(res, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+# Из графика выберем оптимальное число кластеров
+optimal_k <- 4 
+# Применение k-средних с выбранным числом кластеров
+ 
+kmeans_result <- kmeans(res, centers = optimal_k)
+
+# Визуализация результатов
+res_df <- as.data.frame(res)
+
+# Добавление информации о кластерах к результатам PCA
+res_df$cluster <- as.factor(kmeans_result$cluster)
+
+# Визуализация результатов
+ggplot(res_df, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 3) +
+  labs(title = "K-Means Clustering based on PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+```
+# Проверка переменных на возможность применения log-трансформации:
+
+
+## qq-plots
+
+
+```{r echo = FALSE}
+qq_plot <- function(variable_name, variable) {
+  qqnorm(variable, main = paste("Q-Q Plot for", variable_name))
+  qqline(variable, col = 2)
+}
+
+par(mfrow = c(3, 3), mar = c(4, 4, 2, 1))
+
+# Iterate over column names and call qq_plot function
+lapply(colnames(pca_df), function(var_name) {
+  qq_plot(var_name, pca_df[[var_name]])
+})
+
+
+```
+
+
+
+```{r include=FALSE}
+vars <- colnames(pca_df)
+# Проверка на нормальность распределения
+  # Выполняем тест Шапиро-Уилка
+ shapiro_results <-  lapply(vars, function(var_name) {
+  shapiro_test_result <- shapiro.test(pca_df[[var_name]])
+  data.frame(
+    Variable = var_name,
+    W = shapiro_test_result$statistic,
+    p_value = shapiro_test_result$p.value,
+    stringsAsFactors = FALSE
+  )
+})
+
+# Combine the results into a data frame
+shapiro_table <- bind_rows(shapiro_results)
+ 
+shapiro_table %>% filter(p_value > 0.05) %>% select(Variable) -> vars_norm_distr
+
+shapiro_table %>% filter(p_value > 0.05)
+
+```
+
+
+# Лог-трансформация переменных:
+
+
+Проверка наличия нулевых значений:
+
+
+```{r echo=FALSE}
+pca_df %>% select(!c(cd3_abs, cd4_abs, creatinine_clearence)) -> log_df
+
+variables_with_zero <- log_df %>%
+  mutate(across(everything(), ~ any(. == 0, na.rm = TRUE))) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "HasZero") %>%
+  filter(HasZero == TRUE) %>%
+  pull(Variable) %>% unique()
+
+# Вывести переменные с 0
+print(variables_with_zero)
+
+```
+
+Следовательно, добавляем константу при логарифмировании переменных (log(x + 1))
+
+```{r include=FALSE}
+log_transform <- function(x) {
+  log(x + 1)
+}
+
+# Применение лог-трансформации ко всем переменным
+logc_df <- lapply(log_df, log_transform)
+
+```
+
+
+
+
+```{r include=FALSE}
+## Объединяем переменные
+duplicated_vars <- intersect(names(pca_df), names(logc_df))
+
+logpca_df <- as.data.frame(Map(function(x, y) if (y %in% duplicated_vars) logc_df[[y]] else pca_df[[y]], pca_df, names(pca_df))) 
+```
+
+```{r include=FALSE}
+par(mfrow = c(3, 3), mar = c(4, 4, 2, 1))
+
+# Iterate over column names and call qq_plot function
+lapply(colnames(logpca_df), function(var_name) {
+  qq_plot(var_name, logpca_df[[var_name]])
+})
+
+
+par(mfrow = c(3, 3), mar = c(4, 4, 2, 1))
+
+# Iterate over column names and call qq_plot function
+lapply(colnames(pca_df), function(var_name) {
+  qq_plot(var_name, pca_df[[var_name]])
+})
+```
+
+## PCA: Визуализация Cumulative Proportion:
+
+```{r include=FALSE}
+logpca_df.pca <- prcomp(na.omit(logpca_df), scale = T) 
+```
+
+
+```{r echo=FALSE}
+fviz_eig(logpca_df.pca, addlabels = T, ylim = c(0, 30))
+
+```
+64.1 % вариативности данных обьясняются первыми пятью главными компонентами (результат практически идентичен с результатом без log-трансформации), больше 10 % вариативности обьясняют первые 3 главные компоненты: 
+
+```{r echo=FALSE}
+
+fviz_contrib(logpca_df.pca, choice = "var", axes = 1, top = 8) # 1
+fviz_contrib(logpca_df.pca, choice = "var", axes = 2, top = 8) # 2
+fviz_contrib(logpca_df.pca, choice = "var", axes = 3, top = 8) # 3
+```
+
+```{r include=FALSE}
+fviz_pca_var(logpca_df.pca, col.var = "contrib", labelsize = 2)
+```
+
+Основные составляющие главных компонент: 
+
+
+Можно выделить переменныe, которые вносят наибольший вклад в первые 3 главные компоненты: 
+
+
+```{r echo=FALSE}
+fviz_pca_var(logpca_df.pca, 
+             select.var = list(contrib = 7), # Задаём число здесь 
+             col.var = "contrib")
+
+fviz_pca_var(logpca_df.pca, 
+             axes = c(2, 3), 
+             select.var = list(contrib = 6), # Задаём число здесь 
+             col.var = "contrib")
+
+```
+## Biplot
+
+```{r echo=FALSE}
+
+ggbiplot(logpca_df.pca, 
+         scale=0, alpha = 0.1) + 
+  theme_minimal()
+
+```
+
+
+
+
+
+
+## Кластеры на основе данных PCA
+
+```{r echo=FALSE}
+res <- logpca_df.pca$x
+
+wss <- (nrow(res)-1)*sum(apply(res,2,var))
+for (i in 1:15) wss[i] <- sum(kmeans(res, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+# Из графика выберем оптимальное число кластеров
+optimal_k <- 4 
+# Применение k-средних с выбранным числом кластеров
+ 
+kmeans_result <- kmeans(res, centers = optimal_k)
+
+# Визуализация результатов
+res_df <- as.data.frame(res)
+
+# Добавление информации о кластерах к результатам PCA
+res_df$cluster <- as.factor(kmeans_result$cluster)
+
+# Визуализация результатов
+ggplot(res_df, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 3) +
+  labs(title = "K-Means Clustering based on PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+```
+
+
+# PCA с импутацией количественных переменных:
+Импутация методом kNN
+```{r include=FALSE}
+pca_dfi <- pca_df 
+summary(aggr(pca_dfi, prop = TRUE, gap = 1))
+
+sorted_cols_pca <- pca_dfi %>% 
+    is.na() %>% colSums() %>% 
+    sort(decreasing = FALSE) %>%  names()
+
+pca_dfi  %>% select(all_of(sorted_cols_pca)) %>%  kNN(., k = 5) -> pca_df_imputed # %>% в анализ
+
+# kNN импутация
+pca_df_imputed  
+
+
+for (col in colnames(pca_dfi)) {
+  pca_dfi[[col]] <- coalesce(pca_dfi[[col]], pca_df_imputed[[col]])
+}
+aggr(pca_dfi, prop = FALSE)
+
+
+?coalesce()
+```
+
+```{r echo = FALSE}
+
+pca_dfi.pca <- prcomp(na.omit(pca_dfi), scale = T) 
+
+```
+
+
+## Визуализация Cumulative Proportion:
+
+
+
+```{r echo = FALSE}
+
+
+fviz_eig(pca_dfi.pca, addlabels = T, ylim = c(0, 30))
+
+```
+
+61.5 % вариативности данных обьясняются первыми пятью главными компонентами, больше 10 % вариативности обьясняют первые 2 главные компоненты: 
+
+
+```{r echo = FALSE}
+
+fviz_contrib(pca_dfi.pca, choice = "var", axes = 1, top = 10) + theme_bw()  +
+         theme(axis.text.x = element_text(angle=-90))
+fviz_contrib(pca_dfi.pca, choice = "var", axes = 2, top = 10)  +
+         theme_bw()  +
+         theme(axis.text.x = element_text(angle=-90))  # 2
+fviz_contrib(pca_dfi.pca, choice = "var", axes = 3, top = 10)  +
+         theme_bw()  +
+         theme(axis.text.x = element_text(angle=-90))  # 3
+
+
+
+```
+
+Основные составляющие главных компонент: 
+
+
+Можно выделить 7 переменных, которые вносят наибольший вклад в главные компоненты: 
+
+
+```{r echo=FALSE}
+fviz_pca_var(pca_dfi.pca, 
+             select.var = list(contrib = 7),  
+             col.var = "contrib")
+
+fviz_pca_var(pca_dfi.pca, 
+             select.var = list(contrib = 7),
+             axes = c(2, 3), 
+             col.var = "contrib")
+
+
+```
+
+
+
+
+
+## Кластеры на основе данных PCA
+
+```{r echo=FALSE}
+res <- pca_dfi.pca$x
+
+wss <- (nrow(res)-1)*sum(apply(res,2,var))
+for (i in 1:15) wss[i] <- sum(kmeans(res, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+# Из графика выберем оптимальное число кластеров
+optimal_k <- 4 
+# Применение k-средних с выбранным числом кластеров
+ 
+kmeans_result <- kmeans(res, centers = optimal_k)
+
+# Визуализация результатов
+res_df <- as.data.frame(res)
+
+# Добавление информации о кластерах к результатам PCA
+res_df$cluster <- as.factor(kmeans_result$cluster)
+
+# Визуализация результатов
+ggplot(res_df, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 3) +
+  labs(title = "K-Means Clustering based on PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+```
+
+
+
+# FAMD (Factorial Analysis of Mixed Data)
+
+
+
+```{r include=FALSE}
+# Перевод в факторные оставшихся переменных
+famd_df <- main_df1 %>% select(1:56) %>%
+  select(!c(vozrast_donora, 
+            vozrast_polnyh_let_na_moment_tkm,
+            donor_vozrast_na_moment_tkm_pred_tk_me_ptkm,
+            massa_tela_na_moment_tkm_ptkm, 
+            rost_na_moment_tkm_pred_tk_me,
+            cummarnaa_doza_busul_fana,
+            data_diagnoza_az_gem,
+            restadirovanie_na_moment_tkm_data_pred_tk_me,
+            donor_rost_sm_pred_tk_me_ptkm,                  
+            donor_ves_pred_tkme_ptkm,
+            indeks_massy_tela,
+            fakticeskaa_massa_pred_tkm_epikriz, wbc, vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm)) %>% 
+  select(!contains("_perc")) %>% select(!(1:2))
+                                               
+
+```
+
+
+MDA метод не позволяет провести анализ с наличием NA в переменных, поэтому требуется импутировать пропущенные значения. Проводим импутацию методом kNN: 
+
+```{r include=FALSE}
+
+#famd_df %>% select(where(is.factor)) %>% tbl_summary()
+categorical_variables <- famd_df %>% select(where(is.factor)) %>% colnames()
+constant_factors <- sapply(famd_df %>% select(where(is.factor)), function(x) length(unique(as.factor(x))) == 1)
+# Бинаризация категориальных переменных
+#binary_matrix <- model.matrix(~ . - 1, data = famd_df %>%
+                                ##select(all_of(categorical_variables)))
+#print(binary_matrix)
+
+# Соединение бинарных переменных с оригинальным датафреймом
+famd_df_binary <- famd_df %>% select(!where(is.factor)) %>% mutate(
+  male1 = ifelse(famd_df$male == 1, 1, 0),
+  relative1 = ifelse(famd_df$relative == 1, 1, 0),
+  beremennosti_pred_tk_me1 = ifelse(famd_df$beremennosti_pred_tk_me == 1, 1, 0),
+  beremennosti_pred_tk_me2 = ifelse(famd_df$beremennosti_pred_tk_me == 2, 1, 0),
+  beremennosti_pred_tk_me3 = ifelse(famd_df$beremennosti_pred_tk_me == 3, 1, 0),
+  beremennosti_pred_tk_me5 = ifelse(famd_df$beremennosti_pred_tk_me == 5, 1, 0),
+  virusy_donora_cmv_pred_tk_me = ifelse(famd_df$virusy_donora_cmv_pred_tk_me == "IgG(+)", 1, 0),
+  virusy_donora_ebv_pred_tk_me = ifelse(famd_df$virusy_donora_ebv_pred_tk_me == "IgG(+)", 1, 0),
+  virusy_donora_toxoplassmosis_pred_tk_me = ifelse(famd_df$virusy_donora_toxoplassmosis_pred_tk_me == "IgG(+)", 1, 0),
+  obsee_kolicestvo_tkm_1 = ifelse(famd_df$obsee_kolicestvo_tkm == 1, 1, 0),
+  obsee_kolicestvo_tkm_2 = ifelse(famd_df$obsee_kolicestvo_tkm == 2, 1, 0),
+  obsee_kolicestvo_tkm_3 = ifelse(famd_df$obsee_kolicestvo_tkm == 3, 1, 0),
+  rezim_kondicionirovania_MA = ifelse(famd_df$rezim_kondicionirovania_pred_tk_me == "миелоаблативный", 1, 0),
+  shema_rk_FluBu = ifelse(famd_df$shema_rk_pred_tk_me == "FluBu", 1, 0),
+  shema_rk_FluBuBenda = ifelse(famd_df$shema_rk_pred_tk_me == "FluBuBenda", 1, 0),
+  shema_rk_FluBuMel = ifelse(famd_df$shema_rk_pred_tk_me == "FluBuMel", 1, 0),
+  shema_rk_FluBuRuxo = ifelse(famd_df$shema_rk_pred_tk_me == "FluBuRuxo", 1, 0),
+  shema_rk_FluBuCy = ifelse(famd_df$shema_rk_pred_tk_me == "FluBuCy", 1, 0),
+  shema_rk_FluCy = ifelse(famd_df$shema_rk_pred_tk_me == "FluCy", 1, 0),
+  shema_rk_FluMel = ifelse(famd_df$shema_rk_pred_tk_me == "FluMel", 1, 0),
+  shema_rk_FluTreo = ifelse(famd_df$shema_rk_pred_tk_me == "FluTreo", 1, 0),
+  Profilaktika_rtph_C = ifelse(famd_df$preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан", 1, 0),
+  Profilaktika_rtph_CBTMMF = ifelse(famd_df$preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, Бендамустин, Такролимус, MMF", 1, 0),
+  Profilaktika_rtph_CR = ifelse(famd_df$preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, Руксолитиниб", 1, 0),
+  Profilaktika_rtph_CS = ifelse(famd_df$preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, Сиролимус", 1, 0),
+ Profilaktika_rtph_CSMMF = ifelse(famd_df$preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, Сиролимус, MMF", 1, 0),
+ Profilaktika_rtph_CTMMF = ifelse(famd_df$preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, Такролимус, MMF", 1, 0),
+ Profilaktika_rtph_CTS = ifelse(famd_df$preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, Такролимус, Сиролимус", 1, 0),
+ Profilaktika_rtph_CTSE = ifelse(famd_df$preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me == "Циклофосфан, Такролимус, Сиролимус, Эверолимус", 1, 0),
+ MAB = ifelse(famd_df$monoklonal_nye_antitela_pred_tk_me == "да", 1, 0),
+ sovmestimost_donora_recipienta_poln = ifelse(famd_df$sovmestimost_donora_recipienta_ptkm_pred_tk_me == "полностью совместимы", 1, 0),
+ istochnik_transplantata_BM = ifelse(famd_df$istocnik_pred_tk_me_ptkm_pdi == "BM", 1, 0)
+) 
+colnames(famd_df_binary)  
+factor_variables <- colnames(famd_df_binary[18:49])
+
+famd_df_binary %>%  mutate(across(all_of(factor_variables), as.factor)) -> famd_df_binary
+```
+
+
+```{r include=FALSE}
+summary(aggr(famd_df_binary, prop = TRUE, gap = 1))
+
+sorted_cols <- famd_df_binary %>% 
+    is.na() %>% colSums() %>% 
+    sort(decreasing = FALSE) %>%  names()
+
+famd_df_binary  %>% select(all_of(sorted_cols)) %>%  kNN(., k = 5) -> famd_imputed # %>% в анализ
+
+# kNN импутация
+famd_imputed  
+
+
+for (col in colnames(famd_df_binary)) {
+  famd_df_binary[[col]] <- coalesce(famd_df_binary[[col]], famd_imputed[[col]])
+}
+aggr(famd_df_binary, prop = FALSE)
+```
+
+```{r echo=FALSE}
+famd_result <- FAMD(famd_df_binary, graph = FALSE)
+
+fviz_eig(famd_result, addlabels = T, ylim = c(0, 20))
+
+fviz_contrib(famd_result, choice = "var", axes = 1, top = 8)  +
+         theme_bw()  +
+         theme(axis.text.x = element_text(angle=-75))
+
+fviz_contrib(famd_result, choice = "var", axes = 2, top = 8)  +
+         theme_bw()  +
+         theme(axis.text.x = element_text(angle=-75))
+
+fviz_contrib(famd_result, choice = "var", axes = 3, top = 8)  +
+         theme_bw()  +
+         theme(axis.text.x = element_text(angle=-75))
+
+fviz_famd_var(famd_result, col.var = "contrib", select.var = list(contrib = 15), repel = TRUE, labelsize = 3)
+fviz_famd_var(famd_result, axes = c(2, 3), select.var = list(contrib = 15), col.var = "contrib", repel = TRUE, labelsize = 3)
+
+
+```
+
+
+
+
+
+

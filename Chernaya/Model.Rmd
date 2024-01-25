@@ -1,0 +1,521 @@
+---
+title: "Model"
+author: "Galina Chernaya"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(coxphf)
+library(survival)
+library(dplyr)
+library(ggplot2)
+library(factoextra)
+library(pheatmap)
+library(FactoMineR)
+library(ggbiplot)
+library(tidymodels)
+library(embed)
+library(GGally)
+library(FactoMineR)
+library(ggsurvfit)
+library(mice)
+library(glmnet)
+library(Matrix)
+library(splitTools)
+library(intsurv)
+library(boot)
+library(SurvHiDim)
+library(caret)
+library(forestplot)
+library(purrr)
+
+```
+Загрузка данных:
+
+```{r include=FALSE}
+main_df <- read.csv("main_df.csv")
+
+```
+
+Перевод в факторные оставшихся переменных
+
+```{r include=FALSE}
+main_df %>% dplyr::select(where(is.character))
+
+variables_to_convert <- c("male", 
+            "relative", 
+            "beremennosti_pred_tk_me", 
+            "obsee_kolicestvo_tkm", 
+            "poradkovyj_nomer_nastoasej_transplantacii_ptkm_pditkm", 
+            "koza_stepen_1god",
+            "slizistaa_polosti_rta_stepen_1god",
+            "glaza_stepen_1god",
+            "zkt_stepen_1god", 
+            "pecen_stepen_1god",
+            "legkie_stepen_1god",
+            "sustavy_i_fascii_stepen_1god",
+            "polovye_organy_stepen_1god",
+            "summarnaa_stepen_tazesti_hrtph_1god",
+            "monoklonal_nye_antitela_pred_tk_me",
+            "vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm",
+            "virusy_donora_cmv_pred_tk_me",
+            "virusy_donora_ebv_pred_tk_me", 
+            "virusy_donora_toxoplassmosis_pred_tk_me",
+            "rezim_kondicionirovania_pred_tk_me",
+            "shema_rk_pred_tk_me",
+            "preparaty_profilaktiki_rtph_libo_ne_provodilis_pred_tk_me",
+            "vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm",
+            "sovmestimost_donora_recipienta_ptkm_pred_tk_me",
+            "istocnik_pred_tk_me_ptkm_pdi",
+            "ottorzenie_tpp_100dn")
+
+variables_to_convert <- unique(variables_to_convert)
+
+main_df[variables_to_convert] <- lapply(main_df[variables_to_convert], factor)
+main_df %>% dplyr::select(where(is.character))
+
+to_fix <- c("nc_ptkm_pdi", "cd34_kg_x10_ptkm_pdi", "cummarnaa_doza_busulfana_razdelit_na_massu_tela", "fakticeskaa_massa_pred_tkm_epikriz")
+main_df[to_fix] <- lapply(main_df[to_fix], function(x) as.numeric(gsub(",", ".", x)))
+
+
+main_df %>%  
+  mutate(restadirovanie_na_moment_tkm_stadia_pred_tk_me = case_when(
+    pacient == 15 ~ "ремиссия",
+    pacient == 64 ~ "ремиссия",
+    pacient == 65 ~ "ремиссия",
+    pacient == 66 ~ "ремиссия",
+    pacient == 67 ~ "рецидив",
+    pacient == 74 ~ "ремиссия",
+    pacient == 98 ~ "ремиссия",
+    TRUE ~ NA_character_
+  ),
+  a_gvhd34time = case_when(a_gvhd34time == -280 ~ 150, TRUE ~ a_gvhd34time),
+  a_gvhd24time = case_when(a_gvhd24time == -280 ~ 150, TRUE ~ a_gvhd24time))
+
+
+main_df <- main_df %>% mutate( a_gvhd24 = ifelse(a_gvhd24 == 1, 1, 0),
+                                a_gvhd34 = ifelse(a_gvhd34 == 1, 1, 0),
+                                c_gvhd = ifelse(c_gvhd == 1, 1, 0),
+                               compete2 = ifelse(compete2 == 1, 1, 0))
+
+main_df <- main_df %>%
+  mutate(rezim_kondicionirovania_pred_tk_me = ifelse(
+    rezim_kondicionirovania_pred_tk_me == "миелоаблативный", "миелоаблативный", "немиелоаблативный"))
+
+```
+
+## Lasso cox regression
+### data
+
+```{r}
+
+
+df_zero <- main_df %>% dplyr::select(vozrast_polnyh_let_na_moment_tkm,
+                                          restadirovanie_na_moment_tkm_stadia_pred_tk_me,
+                                          rezim_kondicionirovania_pred_tk_me,
+                                          sovmestimost_donora_recipienta_ptkm_pred_tk_me,
+                                          vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm,
+                                          cd34_kg_x10_ptkm_pdi, d_z) %>% na.omit()
+
+
+
+df_full_time <- main_df %>% dplyr::select(contains("cd") & contains("abs") | os2time, os2, efs2time, efs2, rel2time, rel2, a_gvhd24time, a_gvhd24, a_gvhd34time, a_gvhd34, c_gvh_dtime, c_gvhd, compete2time, compete2) %>% na.omit() %>% filter(a_gvhd24time >= 0 & a_gvhd34time >= 0 & c_gvh_dtime >= 0 & compete2time >= 0)
+
+df_full <- df_full_time %>% dplyr::select(contains("cd") & contains("abs")) %>% na.omit()
+
+df <- main_df %>% dplyr::select(contains("cd") & contains("abs") | os2time, os2, efs2time, efs2, rel2time, rel2, a_gvhd24time, a_gvhd24, a_gvhd34time, a_gvhd34, c_gvh_dtime, c_gvhd, compete2time, compete2, vozrast_polnyh_let_na_moment_tkm,
+                                          restadirovanie_na_moment_tkm_stadia_pred_tk_me,
+                                          rezim_kondicionirovania_pred_tk_me,
+                                          sovmestimost_donora_recipienta_ptkm_pred_tk_me,
+                                          vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm,
+                                          cd34_kg_x10_ptkm_pdi, d_z) %>% filter(a_gvhd24time >= 0 & a_gvhd34time >= 0 & c_gvh_dtime >= 0 & compete2time >= 0) %>% na.omit()
+covariates_zero <- "vozrast_polnyh_let_na_moment_tkm + restadirovanie_na_moment_tkm_stadia_pred_tk_me + sovmestimost_donora_recipienta_ptkm_pred_tk_me + rezim_kondicionirovania_pred_tk_me + vid_tkm_nastoasej_ptkm_pred_tk_me_pditkm + cd34_kg_x10_ptkm_pdi + cd3cd56_abs + cd16_abs"
+covariates_var <- names(df_full)
+
+```
+
+### model
+
+```{r}
+
+fit_cox_lasso <- function(df, df_time, time, event) {
+  # Scale the data
+  df_scaled <- scale(df)
+
+  # Create survival object
+  surv <- with(df_time, Surv(time = time, event = as.numeric(event)))
+
+  # Fit regularized Cox model
+  cvev <- cv.glmnet(x = df_scaled, y = surv, family = "cox", alpha = 1)
+  
+  # Get the optimal lambda
+  cvev$lambda.min -> l
+  
+  # Fit the model with the optimal lambda
+  fit <- glmnet(x = df_scaled, y = surv, family = "cox", alpha = 1, lambda = l)
+
+  # Extract nonzero coefficients and their corresponding variable names
+
+  nonzero_coef <- as.matrix(coef(fit))
+  nonzero_var_names <- rownames(nonzero_coef)[nonzero_coef != 0]
+
+  return(data.frame(variable = nonzero_var_names, coefficient = nonzero_coef[nonzero_coef != 0]))
+}
+
+# Usage
+fit_cox_lasso(df_full, df_full_time, df_full_time$os2time, df_full_time$os2)
+fit_cox_lasso(df_full, df_full_time, df_full_time$efs2time, df_full_time$efs2)
+fit_cox_lasso(df_full, df_full_time, df_full_time$rel2time, df_full_time$rel2)
+fit_cox_lasso(df_full, df_full_time, df_full_time$a_gvhd24time, df_full_time$a_gvhd24)
+fit_cox_lasso(df_full, df_full_time, df_full_time$c_gvh_dtime, df_full_time$c_gvhd)
+fit_cox_lasso(df_full, df_full_time, df_full_time$compete2time, df_full_time$compete2)
+
+```
+
+### coxph function
+
+
+
+```{r warning=FALSE}
+
+
+coxph_analysis <- function(time_var, event_var, data, cov, df_zero) {
+ 
+   # Preparation of surv formula
+  
+   covariates <- paste(c(covariates_zero, cov), collapse = " + ")
+  
+  formula <- as.formula(paste("Surv(", time_var, " , ", event_var, ") ~ ", covariates))
+
+   # Scaling of numeric variables
+  
+  numeric_covariates <- df %>% select(names(df_zero) | names(cov)) %>% select(where(is.numeric))
+  data <- data %>% mutate(across(everything(numeric_covariates), scale))
+  
+   #  coxph model
+  cox_model <- coxph(formula, data = data)
+  
+  # returning C-index
+ cox_model$concordance[[6]]
+}
+
+# Usage
+
+data <- df  
+time_var <- "c_gvh_dtime"  # time to event
+event_var <- "c_gvhd"  # event
+cov <- 0 # Vector with names of new predictors (0 for zero model)
+df_zero <- df_zero # data frame for zero model
+
+results_list <- lapply(cov, function(covariate) {
+  coxph_analysis(time_var, event_var, data, covariate, df_zero)
+  })
+results_list
+
+
+```
+
+## boot + coxph function
+
+```{r warning=FALSE}
+cov <- names(df_full)
+
+# Modified bootstrap function
+boot_f <- function(time_var, event_var, data, covariates, df_zero) {
+  
+  # Define the statistic function for the bootstrap
+  bootstrap_coxph <- function(data, indices) {
+    # Obtain a bootstrap sample
+    samp <- data[indices, ]
+    
+    # Call coxph_analysis function for each covariate
+    c_indices <- sapply(covariates, function(covariate) {
+      result <- tryCatch({
+        coxph_analysis(time_var, event_var, samp, covariate, df_zero)
+      }, error = function(e) {
+        1  # Возвращаем 1 в случае ошибки
+      })
+      return(result)
+    })
+    
+    c_index_cov_0 <- tryCatch({
+      coxph_analysis(time_var, event_var, samp, "0", df_zero)
+    }, error = function(e) {
+      1  # Возвращаем 1 в случае ошибки
+    })
+    
+    # Возвращаем результаты
+    return(c(c_indices, c_index_cov_0))
+  }
+
+  # Perform bootstrap
+  boot_results <- boot(data = data, statistic = bootstrap_coxph, R = 2000)
+
+  # Extract C-indices
+  c_indices <- boot_results$t
+  c_indices_results <- do.call(rbind, list(c_indices))
+  colnames(c_indices_results) <- c(covariates, "zero")
+  
+  return(c_indices_results)
+}
+
+
+
+filter_rows <- function(df) {
+  # counting 1 in each row
+  row_sum <- rowSums(df == 1)
+  filtered_df <- df[row_sum <= 3, ]
+  return(filtered_df)
+}
+
+
+```
+
+
+  
+### Usage 
+```{r warning=FALSE}
+# Usage
+
+# Create a data frame with results
+
+
+results_df_c_gvhd <- boot_f(time_var = "c_gvh_dtime",
+                     event_var = "c_gvhd",
+                     data = df,
+                     covariates = cov,
+                     df_zero = df_zero) %>% filter_rows()
+
+results_df_os2 <- boot_f(time_var = "os2time",
+                     event_var = "os2",
+                     data = df,
+                     covariates = cov,
+                     df_zero = df_zero) %>% filter_rows()
+
+results_df_efs2 <- boot_f(time_var = "efs2time",
+                     event_var = "efs2",
+                     data = df,
+                     covariates = cov,
+                     df_zero = df_zero) %>% filter_rows()
+
+results_df_rel2 <- boot_f(time_var = "rel2time",
+                     event_var = "rel2",
+                     data = df,
+                     covariates = cov,
+                     df_zero = df_zero) %>% filter_rows()
+
+results_df_a_gvhd24 <- boot_f(time_var = "a_gvhd24time",
+                     event_var = "a_gvhd24",
+                     data = df,
+                     covariates = cov,
+                     df_zero = df_zero) %>% filter_rows()
+
+results_df_compete2 <- boot_f(time_var = "compete2time",
+                     event_var = "compete2",
+                     data = df,
+                     covariates = cov,
+                     df_zero = df_zero) %>% filter_rows()
+
+
+
+```
+  
+  
+### sum dataset
+  
+```{r }
+
+results_dfs <- list(data.frame(results_df_os2), data.frame(results_df_efs2), data.frame(results_df_compete2), data.frame(results_df_rel2), data.frame(results_df_a_gvhd24), data.frame(results_df_c_gvhd)) %>% na.omit()
+
+
+extract_stats <- function(df) {
+  
+  calculate_ci <- function(x) {
+    sd_val <- sd(x, na.rm = TRUE)  # Add na.rm = TRUE to handle NAs
+    mean_val <- mean(x, na.rm = TRUE)
+    n <- length(x)
+    error <- qt(0.975, n-1) * sd_val / sqrt(n)
+    ci_lower <- mean_val - error
+    ci_upper <- mean_val + error
+    
+    r_df <- c(names(x), mean_val, ci_lower, ci_upper)
+    
+    return(r_df)
+  }
+  
+ result <- df %>% lapply(., calculate_ci)
+  
+  return(result)
+}
+
+dfs <- lapply(results_dfs , extract_stats) %>% data.frame() %>%
+  rownames_to_column(var = "stat") %>% mutate(stat = c("mean", "l_ci", "up_ci")) #%>% #pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+  
+
+```
+
+
+### forest plots: mean C-index
+
+
+```{r }
+
+library(forestplot)
+#install.packages("forestplot")
+
+df_os2 <- dfs %>% select(!contains(".")) %>% 
+          pivot_longer(., cols = -stat, names_to = "names", values_to = "value") 
+df_efs2 <- dfs %>% select(stat, contains(".1")) %>% 
+          pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+df_compete2 <- dfs %>% select(stat, contains(".2")) %>% 
+          pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+df_rel2 <- dfs %>% select(stat, contains(".3")) %>% 
+          pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+df_a_gvhd24 <- dfs %>% select(stat, contains(".4")) %>% 
+          pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+df_c_gvhd <- dfs %>% select(stat, contains(".5")) %>% 
+          pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+
+
+
+# forest plot function 
+
+forest_plot <- function(df, title) {
+  mean_values <- df %>%
+    filter(stat == "mean") %>%
+    select(names, value)
+
+  lower_ci <- df %>%
+    filter(stat == "l_ci") %>%
+    select(value)
+
+  upper_ci <- df %>%
+    filter(stat == "up_ci") %>%
+    select(value)
+
+  forestplot(mean = mean_values$value,  # Mean C-index
+             lower = lower_ci$value,     # Lower CI
+             upper = upper_ci$value,     # Upper CI
+             labeltext = mean_values$names,                   
+             xlab = "Mean C-index",
+             title = title,
+             boxsize = 0.3,
+             xticks = c(0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0)) 
+}
+
+# Create forest plots
+
+forest_plot(df_os2, title = "OS")
+forest_plot(df_efs2, title = "Event free survival")
+forest_plot(df_compete2, title = "Eventless mortality")
+forest_plot(df_rel2, title = "Relapse")
+forest_plot(df_a_gvhd24, title = "Aqute GVHD")
+forest_plot(df_c_gvhd, title = "Chronic GVHD")
+
+
+```
+
+
+### forest plots: Added value
+ preparing data
+
+```{r}
+
+
+extract_stats_added <- function(df) {
+  
+  df <- df - df$zero
+  
+  df <- df %>% select(!zero)
+  
+  calculate_ci <- function(x) {
+    sd_val <- sd(x, na.rm = TRUE)  # Add na.rm = TRUE to handle NAs
+    mean_val <- mean(x, na.rm = TRUE)
+    n <- length(x)
+    error <- qt(0.975, n-1) * sd_val / sqrt(n)
+    ci_lower <- mean_val - error
+    ci_upper <- mean_val + error
+    t_test_result <- t.test(x, mu = 0)
+    p_value <- t_test_result$p.value
+    r_df <- c(names(x), mean_val, ci_lower, ci_upper, p_value)
+    
+    return(r_df)
+  }
+
+
+ result <- df %>% lapply(., calculate_ci)
+  
+  return(result)
+}
+
+dfs_added <- lapply(results_dfs , extract_stats_added) %>% data.frame() %>%
+  rownames_to_column(var = "stat") %>% mutate(stat = c("mean", "l_ci", "up_ci", "p-value"))
+```
+
+
+plots
+
+
+
+```{r }
+
+
+df_os2_added <- dfs_added %>% select(!contains(".")) %>% 
+              pivot_longer(., cols = -stat, names_to = "names", values_to = "value") 
+df_efs2_added <- dfs_added %>% select(stat, contains(".1")) %>% 
+              pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+df_compete2_added <- dfs_added %>% select(stat, contains(".2")) %>% 
+              pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+df_rel2_added <- dfs_added %>% select(stat, contains(".3")) %>% 
+              pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+df_a_gvhd24_added <- dfs_added %>% select(stat, contains(".4")) %>% 
+              pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+df_c_gvhd_added <- dfs_added %>% select(stat, contains(".5")) %>% 
+              pivot_longer(., cols = -stat, names_to = "names", values_to = "value")
+
+
+
+# Create forest plots
+forest_plot <- function(df, title) {
+  mean_values <- df %>%
+    filter(stat == "mean") %>%
+    select(names, value)
+
+  lower_ci <- df %>%
+    filter(stat == "l_ci") %>%
+    select(value)
+
+  upper_ci <- df %>%
+    filter(stat == "up_ci") %>%
+    select(value)
+  
+  p_value <- df %>%
+    filter(stat == "p_value") %>%
+    select(value) %>% round(., digits = 2)
+  
+   
+  
+  forestplot(mean = mean_values$value,  # Mean C-index
+             lower = lower_ci$value,     # Lower CI
+             upper = upper_ci$value,     # Upper CI
+             labeltext = paste(mean_values$names, p_value, sep = "\\"),              
+             xlab = "Mean Added Value",
+             title = title,
+             boxsize = 0.2,
+             xticks = c(0.0, 0.05, 0.1)) 
+}
+
+
+forest_plot(df_os2_added, title = "OS: Mean added value")
+forest_plot(df_efs2_added, title = "Event free survival: Mean added value")
+forest_plot(df_compete2_added, title = "Eventless mortality: Mean added value")
+forest_plot(df_rel2_added, title = "Relapse: Mean added value")
+forest_plot(df_a_gvhd24_added, title = "Aqute GVHD: Mean added value")
+forest_plot(df_c_gvhd_added, title = "Chronic GVHD: Mean added value")
+
+
+```
+
+
