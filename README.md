@@ -1,54 +1,36 @@
-# The influence of the immunological status of the donor on the outcome of allogeneic hematopoietic stem cell transplantation using post-transplantant cyclophosphamide
-## Работа в репозитории GitHub в команде: общий набор шагов
+# Association of the donor immunological status with the outcomes of allogeneic hematopoietic stem cell transplantation using posttransplantation cyclophosphamide
 
-### Клонирование репозитория:
-Каждый член команды должен начать с клонирования репозитория на свой локальный компьютер. Команда может использовать команду git clone:
+## Background
 
-git clone <URL_репозитория>
+Despite the active development of targeted and immunotherapy, allo-HSCT remains one of the important options for patients with hematological malignancies. However, this procedure is associated with a multitude of risks, and one of the main life-threatening complications is GVHD.
 
+Numerous prophylactic regimens for GVHD have been developed, and in recent years, prophylaxis with cyclophosphamide has gained popularity due to its demonstrated high clinical efficacy. However, the biological effects of cyclophosphamide and its impact on recipient immune reconstitution remain not fully understood, and this issue is currently actively researched. A research team has already conducted a study involving patients receiving Cy, which demonstrated an association between the cellular composition of the transplant on one hand, and immune reconstitution (and consequently, survival) and the likelihood of developing severe GVHD on the other. Consequently, the idea of a possible association with the peripheral blood composition of the donor has emerged, which would allow predicting transplantation outcomes based on analysis of the donor's peripheral blood even before the donation procedure.
 
-### Создание и переключение веток:
-Каждая задача или новая функциональность может быть разработана в отдельной ветке. Команда может использовать:
+This suggests the potential for pre-transplant screening based on donor peripheral blood analysis, enhancing the ability to predict transplantation outcomes and tailor interventions accordingly.
 
-git branch <название_ветки>
+### Purpose
 
+The purpose of this study is to identify potential predictors of allo-HSCT (allogeneic hematopoietic stem cell transplantation) outcomes based on the immunological characteristics of the donor’s peripheral blood.
 
-git checkout <название_ветки>
+### Objectives
+1.Data preparation for analysis and descriptive statistics to describe donor & patient characteristics, HSCT procedure, and its outcomes
+2.Assessment of the potential association between donor immunological characteristics and allogeneic HSCT outcomes
+3.Development of a model including immunological and other characteristics to predict allogeneic HSCT outcomes
+4.Model quality assessment (added predictive value)
 
-
-Или сразу создать и переключиться:
-
-
-git checkout -b <название_ветки>
-
-
-### Внесение изменений и фиксация:
-Каждый участник вносит изменения в своей ветке и фиксирует их:
+### Result
 
 
-git add .
+### Conclusion and further plans
 
 
-git commit -m "Описание изменений"
+### Bibliography
 
-
-### Обновление и синхронизация:
-Регулярно получайте обновления из основной ветки (обычно main или master) и решайте возможные конфликты:
-
-
-git pull origin main
-
-
-### Пуш изменений в репозиторий:
-После завершения задачи или функциональности, отправьте свои изменения в репозиторий:
-
-
-git push origin <название_ветки>
 
 
 ### Pull Request:
-Когда задача готова для рецензии и объединения, создайте Pull Request (PR). Владелец репозитория или другие участники команды могут рецензировать изменения и внести их в основную ветку.
+
 
 
 ### Решение конфликтов:
-В случае конфликтов при слиянии, команда должна их решить. Обычно это включает в себя внесение правок, обсуждение изменений и повторное тестирование.
+
