@@ -8,7 +8,7 @@ Numerous prophylactic regimens for GVHD have been developed, and in recent years
 
 This suggests the potential for pre-transplant screening based on donor peripheral blood analysis, enhancing the ability to predict transplantation outcomes and tailor interventions accordingly.
 
-### Purpose
+## Purpose
 The purpose of this study is to identify potential predictors of allo-HSCT (allogeneic hematopoietic stem cell transplantation) outcomes based on the immunological characteristics of the donor’s peripheral blood.
 
 ### Objectives
@@ -22,15 +22,21 @@ The purpose of this study is to identify potential predictors of allo-HSCT (allo
 6. Development of a model including immunological and other characteristics to predict allogeneic HSCT outcomes
 7. Model quality assessment (added predictive value)
 
-### Result
+## Result
 
 
 ### Conclusion and further plans
 
 
-### Bibliography
+### References
 1. Moiseev IS, et al. High prevalence of CD3, NK, and NKT cells in the graft predicts adverse outcome after matched-related and unrelated transplantations with post transplantation cyclophosphamide. Bone Marrow Transplant. 2020 Mar;55(3):544-552. https://doi.org/10.1038/s41409-019-0665-3
-2.
+2. Zhao, C., Bartock, M., Jia, B. et al. Post-transplant cyclophosphamide alters immune signatures and leads to impaired T cell reconstitution in allogeneic hematopoietic stem cell transplant. J Hematol Oncol 15, 64 (2022). https://doi.org/10.1186/s13045-022-01287-3
+3. Nakamae H, Fujii K, Nanno S, et al. A prospective observational study of immune reconstitution following transplantation with post-transplant reduced-dose cyclophosphamide from HLA-haploidentical donors. Transpl Int. 2019;32(12):1322-1332. doi:10.1111/tri.13494
+4. https://github.com/JanMarvin/openxlsx2
+5. https://cran.r-project.org/web/packages/janitor/vignettes/janitor.html
+6. https://r4ds.had.co.nz/strings.html#matching-patterns-with-regular-expressions
+7. https://github.com/georgheinze/coxphf
+8. 
 
 
 
