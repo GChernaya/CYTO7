@@ -12,15 +12,15 @@ This suggests the potential for pre-transplant screening based on donor peripher
 The purpose of this study is to identify potential predictors of allo-HSCT (allogeneic hematopoietic stem cell transplantation) outcomes based on the immunological characteristics of the donor’s peripheral blood.
 
 ### Objectives
-1.Preprocessing complex data
-2.Descriptive statistics to describe donor & patient characteristics, HSCT procedure and its outcomes
-3.Identification of outcomes and their potential predictors
-4.Exploratory analysis:
-   -Identification of correlated variables (correlation analysis, clustering, principal component analysis)
-   -Identification of associations (univariate regression analysis)
-5.Assessment of the potential association between donor immunological characteristics and allogeneic HSCT outcomes
-6.Development of a model including immunological and other characteristics to predict allogeneic HSCT outcomes
-7.Model quality assessment (added predictive value)
+1. Preprocessing complex data
+2. Descriptive statistics to describe donor & patient characteristics, HSCT procedure and its outcomes
+3. Identification of outcomes and their potential predictors
+4. Exploratory analysis:
+- Identification of correlated variables (correlation analysis, clustering, principal component analysis)
+- Identification of associations (univariate regression analysis)
+5. Assessment of the potential association between donor immunological characteristics and allogeneic HSCT outcomes
+6. Development of a model including immunological and other characteristics to predict allogeneic HSCT outcomes
+7. Model quality assessment (added predictive value)
 
 ### Result
 
@@ -29,7 +29,7 @@ The purpose of this study is to identify potential predictors of allo-HSCT (allo
 
 
 ### Bibliography
-1.Moiseev IS, et al. High prevalence of CD3, NK, and NKT cells in the graft predicts adverse outcome after matched-related and unrelated transplantations with post transplantation cyclophosphamide. Bone Marrow Transplant. 2020 Mar;55(3):544-552. https://doi.org/10.1038/s41409-019-0665-3
+1. Moiseev IS, et al. High prevalence of CD3, NK, and NKT cells in the graft predicts adverse outcome after matched-related and unrelated transplantations with post transplantation cyclophosphamide. Bone Marrow Transplant. 2020 Mar;55(3):544-552. https://doi.org/10.1038/s41409-019-0665-3
 2.
 
 
