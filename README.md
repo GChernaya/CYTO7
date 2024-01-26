@@ -29,24 +29,38 @@ The purpose of this study is to identify potential predictors of allo-HSCT (allo
 
 
 
-### Exploratory analysis
+### Exploratory analysis:
 ### 1. Correlation analysis, clustering, PCA
+
+
+![image](https://github.com/GChernaya/CYTO7/assets/75510914/e28f6ff5-796c-4e1b-bb9a-164bf81bac17)
+
+
+![image](https://github.com/GChernaya/CYTO7/assets/75510914/4b9bc7ea-a470-4179-96a3-a3d3d5fb006d)
+
+
+![image](https://github.com/GChernaya/CYTO7/assets/75510914/c06b2400-eddb-461f-b5ad-638fcddcf3fb)
+
+
 
 ### 2. Univariate regression analysis
 
 ### Multiple Cox regression models: selection of predictors, calculation of added value
 
+![image](https://github.com/GChernaya/CYTO7/assets/75510914/2731d20a-979f-49e8-9f0a-7af1fc3c5bd0)
 
 
-### Conclusion and further plans
+## Conclusion and further plans
+Parameters considered as potential new predictors of outcomes (event-free survival, chronic GVHD) did not demonstrate significant clinical significance despite statistically significant differences in the available data.
+The approach used to select for new predictors may not be suitable for rare outcomes; therefore, it may be worthwhile to consider alternative methods for new predictor selection.
 
 
 
 Further plans:
 
-
 1. Develop pipeline for appropriate imputation.   
 2. Apply developed pipeline for selection of predictors to imputed data.
+3. Apply methods for rare outcomes
 
 ### References
 1. Moiseev IS, et al. High prevalence of CD3, NK, and NKT cells in the graft predicts adverse outcome after matched-related and unrelated transplantations with post transplantation cyclophosphamide. Bone Marrow Transplant. 2020 Mar;55(3):544-552. https://doi.org/10.1038/s41409-019-0665-3
