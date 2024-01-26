@@ -22,11 +22,31 @@ The purpose of this study is to identify potential predictors of allo-HSCT (allo
 6. Development of a model including immunological and other characteristics to predict allogeneic HSCT outcomes
 7. Model quality assessment (added predictive value)
 
-## Result
+## Results
+
+
+### Describtive statistics
+
+
+
+### Exploratory analysis
+### 1. Correlation analysis, clustering, PCA
+
+### 2. Univariate regression analysis
+
+### Multiple Cox regression models: selection of predictors, calculation of added value
+
 
 
 ### Conclusion and further plans
 
+
+
+Further plans:
+
+
+1. Develop pipeline for appropriate imputation.   
+2. Apply developed pipeline for selection of predictors to imputed data.
 
 ### References
 1. Moiseev IS, et al. High prevalence of CD3, NK, and NKT cells in the graft predicts adverse outcome after matched-related and unrelated transplantations with post transplantation cyclophosphamide. Bone Marrow Transplant. 2020 Mar;55(3):544-552. https://doi.org/10.1038/s41409-019-0665-3
