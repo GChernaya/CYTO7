@@ -57,7 +57,7 @@ The purpose of this study is to identify potential predictors of allo-HSCT (allo
 6. Chronic GVHD
 ![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/6.%20Chronic_GVHD_forest_plot_univariate_cox.png)
 Heatmap with p-values
-![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/6.%20Chronic_GVHD_forest_plot_univariate_cox.png)
+![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/7.%20Heatmap.png)
 
 ### Multiple Cox regression models: selection of predictors, calculation of added value
 
