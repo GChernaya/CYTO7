@@ -44,6 +44,20 @@ The purpose of this study is to identify potential predictors of allo-HSCT (allo
 
 
 ### 2. Univariate regression analysis
+1. Overall survival
+![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/1.%20Overall_survival_forest_plot_univariate_cox.png)
+2. Relapse
+![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/2.%20Relapse_forest_plot_univariate_cox.png)
+3. Event-free survival
+![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/3.%20Event_free_survival_forest_plot_univariate_cox.png)
+4. Event-free mortality
+![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/4.%20Event_free_mortality_forest_plot_univariate_cox.png)
+5. Acute GVHD
+![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/5.%20Acute_GVHD_forest_plot_univariate_cox.png)
+6. Chronic GVHD
+![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/6.%20Chronic_GVHD_forest_plot_univariate_cox.png)
+Heatmap with p-values
+![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/6.%20Chronic_GVHD_forest_plot_univariate_cox.png)
 
 ### Multiple Cox regression models: selection of predictors, calculation of added value
 
