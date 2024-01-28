@@ -26,12 +26,24 @@ The purpose of this study is to identify potential predictors of allo-HSCT (allo
 
 
 ### Describtive statistics
-
-
+* Description of HSCT outcomes 
+  ![](Burmakina/tab1.png)<!-- -->
+  Missing values:
+  ![](Burmakina/unnamed-chunk-6-1.png)<!-- -->
+* Description of known HSCT predictors
+  ![](Burmakina/tab2.png)<!-- -->
+* Description of potential HSCT predictors
+  ![](Burmakina/tab3.png)<!-- -->
+  Missing values:
+  ![](Burmakina/unnamed-chunk-5-1.png)<!-- -->
+ 
 
 ### Exploratory analysis:
 ### 1. Correlation analysis, clustering, PCA
 
+![](Matvienko/clusters.png)<!-- -->
+
+![](Matvienko/corrplot.png)<!-- -->
 
 ![image](https://github.com/GChernaya/CYTO7/assets/75510914/e28f6ff5-796c-4e1b-bb9a-164bf81bac17)
 
