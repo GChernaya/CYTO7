@@ -45,14 +45,9 @@ The purpose of this study is to identify potential predictors of allo-HSCT (allo
 
 ![](Matvienko/corrplot.png)<!-- -->
 
-![image](https://github.com/GChernaya/CYTO7/assets/75510914/e28f6ff5-796c-4e1b-bb9a-164bf81bac17)
+PCA results confirm the result of correlation analysis:
 
-
-![image](https://github.com/GChernaya/CYTO7/assets/75510914/4b9bc7ea-a470-4179-96a3-a3d3d5fb006d)
-
-
-![image](https://github.com/GChernaya/CYTO7/assets/75510914/c06b2400-eddb-461f-b5ad-638fcddcf3fb)
-
+![image](https://github.com/GChernaya/CYTO7/assets/75510914/289474e0-0e3a-4f79-be40-a1fc53213754) ![image](https://github.com/GChernaya/CYTO7/assets/75510914/aeb91786-f5de-4cb9-892c-17c8ec8afa86)
 
 
 ### 2. Univariate regression analysis
@@ -74,20 +69,23 @@ Heatmap with p-values
 
 ### Multiple Cox regression models: selection of predictors, calculation of added value
 
-![image](https://github.com/GChernaya/CYTO7/assets/75510914/2731d20a-979f-49e8-9f0a-7af1fc3c5bd0)
+In the Cox regression model for assessing outcomes (overall survival, event-free survival, death, acute and chronic GVHD), the predictors included were age, diagnosis, disease stage, conditioning regimen, donor-recipient compatibility, type of transplantation, and the number of CD34 cells/kg. This model was taken as the null model, followed by the calculation of Harrell's C-index for this model and for a model with the addition of one of the new potential predictors. Resampling was conducted using the bootstrap method (R = 2000). Subsequently, the mean and confidence intervals for the C-index values of the models were calculated, along with the calculation of added value. This method was successfully applied only to the outcomes of event-free survival and chronic GVHD, possibly due to the limited number of outcomes, sample size, and distribution of values of categorical predictors.
+
+![image](https://github.com/GChernaya/CYTO7/assets/75510914/58a0076b-fde3-42ef-bc72-0130a6f169b5)
+
+Harrell's C-index values are present in Table 1. Parameters considered as potential new predictors of outcomes (event-free survival, chronic GVHD) demonstrated added value less than 3% (Table 2), despite statistically significant differences in the available data for all variables except amount of CD16+ and CD3CD56+ cells.
 
 
 ## Conclusion and further plans
-Parameters considered as potential new predictors of outcomes (event-free survival, chronic GVHD) did not demonstrate significant clinical significance despite statistically significant differences in the available data.
+
+The clinical significance of the effect of parametres, included in analysis, raises doubts. 
 The approach used to select for new predictors may not be suitable for rare outcomes; therefore, it may be worthwhile to consider alternative methods for new predictor selection.
 
-
-
 Further plans:
-
 1. Develop pipeline for appropriate imputation.   
 2. Apply developed pipeline for selection of predictors to imputed data.
 3. Apply methods for rare outcomes
+
 
 ### References
 1. Moiseev IS, et al. High prevalence of CD3, NK, and NKT cells in the graft predicts adverse outcome after matched-related and unrelated transplantations with post transplantation cyclophosphamide. Bone Marrow Transplant. 2020 Mar;55(3):544-552. https://doi.org/10.1038/s41409-019-0665-3
@@ -97,7 +95,7 @@ Further plans:
 5. https://cran.r-project.org/web/packages/janitor/vignettes/janitor.html
 6. https://r4ds.had.co.nz/strings.html#matching-patterns-with-regular-expressions
 7. https://github.com/georgheinze/coxphf
-8. 
+
 
 
 
