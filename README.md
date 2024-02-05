@@ -73,7 +73,7 @@ In the Cox regression model for assessing outcomes (overall survival, event-free
 
 ![image](https://github.com/GChernaya/CYTO7/assets/75510914/58a0076b-fde3-42ef-bc72-0130a6f169b5)
 
-Harrell's C-index values are present in Table 1. Parameters considered as potential new predictors of outcomes (event-free survival, chronic GVHD) demonstrated added value less than 3% (Table 2), despite statistically significant differences in the available data for all variables except amount of CD16+ and CD3CD56+ cells.
+Harrell's C-index values are present in [Table 1](https://github.com/GChernaya/CYTO7/blob/main/table1.html). Parameters considered as potential new predictors of outcomes (event-free survival, chronic GVHD) demonstrated added value less than 3% (Table 2), despite statistically significant differences in the available data for all variables except amount of CD16+ and CD3CD56+ cells.
 
 
 ## Conclusion and further plans
