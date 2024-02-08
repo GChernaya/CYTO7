@@ -26,14 +26,14 @@ The purpose of this study is to identify potential predictors of allo-HSCT outco
 
 
 ### Describtive statistics
-* Description of HSCT outcomes: overall survival, event-free survival, death, acute and chronic GVHD and the time until each outcome
+1. Description of HSCT outcomes: overall survival, event-free survival, death, acute and chronic GVHD and the time until each outcome
   ![](Burmakina/tab1.png)<!-- -->
 * Missing values in outcomes:
   ![](Burmakina/unnamed-chunk-6-1.png)<!-- -->
-* Description of known HSCT predictors:
-  We analyzed data from 95 patients diagnosed with acute leukemia (73%), myeloproliferative (16%), and lymphoproliferative disorders (7%). The majority (89%) of patients are currently in remission. Transplantations were conducted using both myeloablative (49%) and non-myeloablative (51%) regimens, with both related (57%) and unrelated (43%) donors. Donor-recipient pairs included both fully matched (37%) and partially matched (63%) cases. Additionally, the analysis encompassed patients across various age groups, including those under 18 years old (23%).
+2. Description of known HSCT predictors:
+* We analyzed data from 95 patients diagnosed with acute leukemia (73%), myeloproliferative (16%), and lymphoproliferative disorders (7%). The majority (89%) of patients are currently in remission. Transplantations were conducted using both myeloablative (49%) and non-myeloablative (51%) regimens, with both related (57%) and unrelated (43%) donors. Donor-recipient pairs included both fully matched (37%) and partially matched (63%) cases. Additionally, the analysis encompassed patients across various age groups, including those under 18 years old (23%).
   ![](Burmakina/tab2.png)<!-- -->
-* Description of potential HSCT predictors: amounts of CD3+, CD4+, CD8+, CD19+, CD56+, CD16+, CD56CD16+, CD4CD8+, and CD3CD56+ cells **единицы измерения??**
+3. Description of potential HSCT predictors: amounts of CD3+, CD4+, CD8+, CD19+, CD56+, CD16+, CD56CD16+, CD4CD8+, and CD3CD56+ cells **единицы измерения??**
   ![](Burmakina/tab3.png)<!-- -->
 * Missing values for potential predictors:
   ![](Burmakina/unnamed-chunk-5-1.png)<!-- -->
