@@ -2,14 +2,14 @@
 
 ## Background
 
-Despite the active development of targeted and immunotherapy, allo-HSCT remains one of the important options for patients with hematological malignancies. However, this procedure is associated with a multitude of risks, and one of the main life-threatening complications is GVHD.
+Despite the active development of targeted and immunotherapy, allo-HSCT (allogeneic hematopoietic stem cell transplantation) remains one of the important options for patients with hematological malignancies. However, this procedure is associated with a multitude of risks, and one of the main life-threatening complications is GVHD.
 
 Numerous prophylactic regimens for GVHD have been developed, and in recent years, prophylaxis with cyclophosphamide has gained popularity due to its demonstrated high clinical efficacy. However, the biological effects of cyclophosphamide and its impact on recipient immune reconstitution remain not fully understood, and this issue is currently actively researched. A research team has already conducted a study involving patients receiving Cy, which demonstrated an association between the cellular composition of the transplant on one hand, and immune reconstitution (and consequently, survival) and the likelihood of developing severe GVHD on the other. Consequently, the idea of a possible association with the peripheral blood composition of the donor has emerged, which would allow predicting transplantation outcomes based on analysis of the donor's peripheral blood even before the donation procedure.
 
 This suggests the potential for pre-transplant screening based on donor peripheral blood analysis, enhancing the ability to predict transplantation outcomes and tailor interventions accordingly.
 
 ## Purpose
-The purpose of this study is to identify potential predictors of allo-HSCT (allogeneic hematopoietic stem cell transplantation) outcomes based on the immunological characteristics of the donor’s peripheral blood.
+The purpose of this study is to identify potential predictors of allo-HSCT outcomes based on the immunological characteristics of the donor’s peripheral blood.
 
 ### Objectives
 1. Preprocessing complex data
@@ -26,15 +26,16 @@ The purpose of this study is to identify potential predictors of allo-HSCT (allo
 
 
 ### Describtive statistics
-* Description of HSCT outcomes 
+* Description of HSCT outcomes: overall survival, event-free survival, death, acute and chronic GVHD and the time until each outcome
   ![](Burmakina/tab1.png)<!-- -->
-** Missing values:
+* Missing values in outcomes:
   ![](Burmakina/unnamed-chunk-6-1.png)<!-- -->
-* Description of known HSCT predictors
+* Description of known HSCT predictors:
+  We analyzed data from 95 patients diagnosed with acute leukemia (73%), myeloproliferative (16%), and lymphoproliferative disorders (7%). The majority (89%) of patients are currently in remission. Transplantations were conducted using both myeloablative (49%) and non-myeloablative (51%) regimens, with both related (57%) and unrelated (43%) donors. Donor-recipient pairs included both fully matched (37%) and partially matched (63%) cases. Additionally, the analysis encompassed patients across various age groups, including those under 18 years old (23%).
   ![](Burmakina/tab2.png)<!-- -->
-* Description of potential HSCT predictors
+* Description of potential HSCT predictors: amounts of CD3+, CD4+, CD8+, CD19+, CD56+, CD16+, CD56CD16+, CD4CD8+, and CD3CD56+ cells **единицы измерения??**
   ![](Burmakina/tab3.png)<!-- -->
-** Missing values:
+* Missing values for potential predictors:
   ![](Burmakina/unnamed-chunk-5-1.png)<!-- -->
  
 
