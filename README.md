@@ -31,7 +31,7 @@ The purpose of this study is to identify potential predictors of allo-HSCT outco
 * Missing values in outcomes:
   ![](Burmakina/unnamed-chunk-6-1.png)<!-- -->
 2. Description of known HSCT predictors:
-* We analyzed data from 95 patients diagnosed with acute leukemia (73%), myeloproliferative (16%), and lymphoproliferative disorders (7%). The majority (89%) of patients are currently in remission. Transplantations were conducted using both myeloablative (49%) and non-myeloablative (51%) regimens, with both related (57%) and unrelated (43%) donors. Donor-recipient pairs included both fully matched (37%) and partially matched (63%) cases. Additionally, the analysis encompassed patients across various age groups, including those under 18 years old (23%). Median follow-up time was 476 days.
+* We analyzed data from 95 patients diagnosed with acute leukemia (77%), myeloproliferative (16%), and lymphoproliferative disorders (7%). The majority (89%) of patients are currently in remission. Transplantations were conducted using both myeloablative (49%) and non-myeloablative (51%) regimens, with both related (57%) and unrelated (43%) donors. Donor-recipient pairs included both fully matched (37%) and partially matched (63%) cases. Additionally, the analysis encompassed patients across various age groups, including those under 18 years old (23%). Median follow-up time was 476 days.
   ![](Burmakina/tab2.png)<!-- -->
 3. Description of potential HSCT predictors: absolut amounts of CD3+, CD4+, CD8+, CD19+, CD56+, CD16+, CD56CD16+, CD4CD8+, and CD3CD56+ cells х10^9/л
   ![](Burmakina/tab3.png)<!-- -->
