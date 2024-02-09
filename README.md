@@ -33,7 +33,13 @@ The purpose of this study is to identify potential predictors of allo-HSCT outco
   ![](Burmakina/tab3.png)<!-- -->
 * Missing values for potential predictors:
   ![](Burmakina/unnamed-chunk-5-1.png)<!-- -->
- 
+4. Descrition of outcomes in the whole group: 
+  ![](Matvienko/OS_whole_group.png)<!-- -->
+  ![](Matvienko/EFS_whole_group.png)<!-- -->
+  ![](Matvienko/CIR_whole_group.png)<!-- -->
+  ![](Matvienko/NRM_whole_group.png)<!-- -->
+  ![](Matvienko/aGVHD_whole_group.png)<!-- -->
+  ![](Matvienko/cGVHD_whole_group.png)<!-- -->
 
 ### Exploratory analysis:
 ### 1. Correlation analysis, clustering, PCA
