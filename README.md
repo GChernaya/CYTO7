@@ -62,7 +62,9 @@ PCA results confirm the result of correlation analysis:
 ![image](https://github.com/GChernaya/CYTO7/blob/9d782ae8f435f46cc2a6b07549f169c15831b226/Serebryakova/6.%20Chronic_GVHD_forest_plot_univariate_cox.png)
 
 Heatmap with p-values
-![image](https://github.com/GChernaya/CYTO7/blob/44afb8763de3467775d1cb6fbb4eb865076e8eec/Serebryakova/Heatmap.png)
+![image](https://github.com/GChernaya/CYTO7/blob/bf11a36dc3e76866ca8f26db237ece837330bd5d/Serebryakova/Heatmap.png)
+
+Then preliminary univariate Cox regression screening without adjustment for multiple comparisons was performed for initial features extraction. Association between OS and the amount of CD16CD56+ cells was found: HR 0.51 (95% CI 0.26 - 1.01). Association between CIR and the CD19+ cell: HR 1.42 (95% CI 1.11 - 1.81), and association between NRM and the CD56+ cell amounts were found: HR 1.34 (95% CI 0.99 - 1.79).
 
 ### Multiple Cox regression models: selection of predictors, calculation of added value
 
