@@ -72,13 +72,11 @@ In the Cox regression model for assessing outcomes (overall survival, event-free
 
 ![image](https://github.com/GChernaya/CYTO7/assets/75510914/f10df880-cdef-465d-ac07-d51f2a4044d5)
 
-95% CI for Harrell's C-index values and added value are present in [Table 1](). Parameters considered as potential new predictors of outcomes (event-free survival, chronic GVHD) demonstrated added value less than 0.1 in most cases  (Table 2), despite statistically significant differences in the available data for all variables except amount of CD16+ and CD3CD56+ cells.
-
+95% CI for Harrell's C-index values and added value are present in [Table 1](https://github.com/GChernaya/CYTO7/blob/main/Table%201.md). Parameters considered as potential new predictors of outcomes (relapse, overall survival, event-free survival, chronic GVHD) demonstrated added value less than 0.05 in most cases.There vere no potential new predictors selected by LASSO regression in percentage of cases from 55,5% of samples for overall survival to 68,1% for chronic GVHD.
 
 ## Conclusion and further plans
-
 The clinical significance of the effect of parametres, included in analysis, raises doubts. 
-The approach used to select for new predictors may not be suitable for rare outcomes; therefore, it may be worthwhile to consider alternative methods for new predictor selection.
+The approach used to select for new predictors may not be suitable for rare outcomes.
 
 Further plans:
 1. Develop pipeline for appropriate imputation.   
