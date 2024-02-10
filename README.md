@@ -88,9 +88,7 @@ The clinical significance of the effect of parametres, included in analysis, rai
 The approach used to select for new predictors may not be suitable for rare outcomes.
 
 Further plans:
-1. Develop pipeline for appropriate imputation.   
-2. Apply developed pipeline for selection of predictors to imputed data.
-3. Apply methods for rare outcomes
+Apply another suitable methods for rare outcomes.
 
 
 ### References
@@ -101,6 +99,7 @@ Further plans:
 5. https://cran.r-project.org/web/packages/janitor/vignettes/janitor.html
 6. https://r4ds.had.co.nz/strings.html#matching-patterns-with-regular-expressions
 7. https://github.com/georgheinze/coxphf
+
 
 
 
